@@ -1,0 +1,41 @@
+// simlpified (not equivalent) version of nand multiplex system from PRISM benchmark suite
+
+dtmc
+
+const int N; // number of inputs in each bundle
+
+const double perr = 0.02; // probability nand works correctly
+const double prob1 = 0.9; // probability initial inputs are stimulated
+
+module multiplex
+
+	c : [0..N]; // counter (number of copies of the nand done)
+
+	s : [0..4]; // local state
+	// 0 - initial state
+	// 1 - set x inputs
+	// 2 - set y inputs
+	// 3 - set outputs
+	// 4 - done
+
+	z : [0..N]; // number of new outputs equal to 1
+
+	x : [0..1]; // value of first input
+	y : [0..1]; // value of second input
+	
+	[] s=0 & (c<N) -> (s'=1); // do next nand if have not done N yet
+	[] s=0 & (c=N) -> (s'=4); // finished (so reset variables not needed to reduce state space)
+	[] s=1 -> prob1 : (x'=1) & (s'=2) + (1-prob1) : (x'=0) & (s'=2); // initially random
+	[] s=2 -> prob1 : (y'=1) & (s'=3) + (1-prob1) : (y'=0) & (s'=3); // initially random
+
+	// use nand gate
+	[] s=3 & z<N & c<N -> (1-perr) : (z'=z+(1-x*y)) & (s'=0) & (c'=c+1) // not faulty
+	         + perr    : (z'=z+(x*y))    & (s'=0) & (c'=c+1); // von neumann fault
+	[] s=4 -> true;
+	
+endmodule
+
+// rewards: final value of gate
+rewards
+	[] s=0 & (c=N) : z/N;
+endrewards
