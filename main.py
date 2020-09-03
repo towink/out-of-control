@@ -1,6 +1,13 @@
 import stormpy
 from unfolder import unfold
 
+# There seems to be a problem when modifying a jani model in stormpy and then building it.
+# Exporting to json and parsing again may help.
+def export_and_parse_jani(jani_model):
+    with open("model.jani", "w") as f:
+        f.write(str(jani_model))
+    jani_model, _ = stormpy.parse_jani_model("model.jani")
+    return jani_model
 
 def main():
     path = "examples/coin_game_with_ints.prism"
@@ -12,21 +19,22 @@ def main():
     jani_props: stormpy.core.Property
     jani_model, jani_props = prism_program.to_jani(prism_props)
 
-    unfolded_jani_model = unfold(jani_model, ["f", "x"])
+    unfolded_jani_model = unfold(jani_model, ["f"])
+    # export to json and parse again
+    unfolded_jani_model = export_and_parse_jani(unfolded_jani_model)
     unfolded_dtmc = stormpy.build_model(unfolded_jani_model)
 
-    print("Final DTMC:")
-    print_dtmc(unfolded_dtmc)
+    print(unfolded_dtmc)
 
     # Uncomment for demonstration that the set initial locations seem to be ignored (for details, see
     # build_test_automaton function):
 
-    for i in range(3):
-        test_automaton = build_test_automaton(jani_model.expression_manager, i)
-        jani_model.replace_automaton(0, test_automaton)
-        test_model = stormpy.build_model(jani_model)
-        print("Test Model with initial state " + str(i) + ":")
-        print_dtmc(test_model)
+    # for i in range(3):
+    #     test_automaton = build_test_automaton(jani_model.expression_manager, i)
+    #     jani_model.replace_automaton(0, test_automaton)
+    #     test_model = stormpy.build_model(jani_model)
+    #     print("Test Model with initial state " + str(i) + ":")
+    #     print_dtmc(test_model)
 
 
 def build_test_automaton(expression_manager: stormpy.ExpressionManager, initial_state: int) -> stormpy.JaniAutomaton:
