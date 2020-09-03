@@ -4,7 +4,7 @@ dtmc
 
 module coingame
 
-	x : [0..21] init 10;
+	x : [0..23] init 10; // the 23 is exclusive
 
 	f : [0..2] init 0;
 
