@@ -28,7 +28,7 @@ class Command:
         return dest in self._destinations
 
     @property
-    def guard(self):
+    def guard(self) -> sp.Expression:
         return self._guard
 
     @property
@@ -36,5 +36,5 @@ class Command:
         return self._source_loc
 
     @property
-    def destinations(self):
+    def destinations(self) -> [Destination]:
         return self._destinations
