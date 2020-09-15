@@ -1,0 +1,19 @@
+// simple coin game example
+
+dtmc
+
+const int N; 
+
+module coingame
+
+	x : [0..N+1] init N/2; 
+
+	f : bool init false;
+
+	[] 0<x & x<N & f=false -> 0.5 : (x'=x-1) + 0.5 : (f'=true);
+	[] 0<x & x<N & f=true -> 0.5 : (x'=x-1) & (f'=false) + 0.5 : (x'=x+3)  & (f'=false);
+	[] x=0 -> true;
+	[] x>=N -> true;
+
+	
+endmodule

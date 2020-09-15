@@ -1,4 +1,5 @@
 import logging
+from typing import Dict
 
 import stormpy as sp
 
@@ -41,30 +42,38 @@ class Update:
     def is_valid(self) -> bool:
         raise NotImplementedError
 
+    def substitute(self, subst_map):
+        raise NotImplementedError
+
+    def evaluate(self, subst_map):
+        raise NotImplementedError
+
 
 class AtomicUpdate(Update):
     # Set of assignments to be executed in_parallel. At most one assignment to each variable is allowed.
-    _par_assignments: [Assignment]
+    _parallel_asgs: [Assignment]
 
     def __init__(self, asg: Assignment = None):
-        self._par_assignments = []
+        self._parallel_asgs = []
         if asg is not None:
-            self._par_assignments.append(asg)
+            self._parallel_asgs.append(asg)
 
     def add_assignment(self, asg: Assignment):
-        self._par_assignments.append(asg)
+        self._parallel_asgs.append(asg)
 
     def vars_assigned_to(self) -> {sp.Variable}:
-        return set(map(lambda asg: asg.lhs, self._par_assignments))
+        return set(map(lambda asg: asg.lhs, self._parallel_asgs))
 
     def rhs_expressions(self) -> {sp.Expression}:
-        return set(map(lambda asg: asg.rhs, self._par_assignments))
+        return set(map(lambda asg: asg.rhs, self._parallel_asgs))
 
     def wp(self, postcondition):
+        debug = str(postcondition)
         substitutions = {}
-        for asg in self._par_assignments:
+        for asg in self._parallel_asgs:
             substitutions[asg.lhs] = asg.rhs
-        return postcondition.substitute(substitutions).simplify()
+        res = postcondition.substitute(substitutions).simplify()
+        return res
 
     def is_idempotent(self):
         # safely approximate idempotency: each variable that is assigned to may not appear nowhere on the right
@@ -75,17 +84,69 @@ class AtomicUpdate(Update):
         return True
 
     def is_nop(self) -> bool:
-        return len(self._par_assignments) == 0
+        return len(self._parallel_asgs) == 0
 
     def is_valid(self) -> bool:
         res = True
-        if len(self.vars_assigned_to()) != len(self._par_assignments):
+        if len(self.vars_assigned_to()) != len(self._parallel_asgs):
             logging.error("variable is assigned more than once in AtomicUpdate")
             res = False
         return res
 
+    # substitute variables in all assignments, remove assignments where lhs becomes const
+    def substitute(self, subst_map) -> Update:
+        result = AtomicUpdate()
+        for asg in self._parallel_asgs:
+            # check if lhs variable is assigned to, if yes then ignore
+            if asg.lhs not in subst_map:
+                subst_asg = Assignment(asg.lhs, asg.rhs.substitute(subst_map).simplify())
+                result.add_assignment(subst_asg)
+        return result
+
+    # converts this update to a dictionary
+    def to_subst_map(self) -> Dict[sp.Variable, sp.Expression]:
+        return {asg.lhs: asg.rhs for asg in self._parallel_asgs}
+
+    # computes an update that is equivalent to executing this update after the other update
+    def after(self, other_update) -> Update:
+        other_update_map = other_update.to_subst_map()
+        result = AtomicUpdate()
+        for asg in other_update._parallel_asgs:
+            result.add_assignment(asg)
+        for asg in self._parallel_asgs:
+            result[asg.lhs] = asg.rhs.substitute(other_update_map).simplify()
+        return result
+
+    def __getitem__(self, lhs: sp.Variable):
+        for asg in self._parallel_asgs:
+            if asg.lhs == lhs:
+                return asg.rhs
+        return None
+
+    def __setitem__(self, lhs: sp.Variable, rhs: sp.Expression):
+        for asg in self._parallel_asgs:
+            if asg.lhs == lhs:
+                asg.rhs = rhs
+                return
+        # lhs variable does not exist
+        self._parallel_asgs.append(Assignment(lhs, rhs))
+
+    # evaluations this update for a possibly partial variable valuation
+    def evaluate(self, subst_map):
+        result = {}
+        for var in subst_map:
+            rhs = self[var]
+            if rhs is not None:
+                result[var] = rhs.substitute(subst_map).simplify()
+            else:
+                result[var] = subst_map[var]
+        return result
+
+    def to_prism_string(self) -> str:
+        return " & ".join(["({}'={})".format(asg.lhs.name, str(asg.rhs)) for asg in self._parallel_asgs])
+
     def __str__(self):
-        return str([str(asg) for asg in self._par_assignments])
+        return str([str(asg) for asg in self._parallel_asgs])
 
 
 class ChainedUpdate(Update):

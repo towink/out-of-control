@@ -1,10 +1,12 @@
-from typing import Dict
+from typing import Dict, Tuple
 import logging
 
 import stormpy as sp
+from stormpy.utility import Z3SmtSolver, SmtCheckResult
 
 from datastructures.command import Command
-from datastructures.update import AtomicUpdate, Assignment
+from datastructures.util import *
+from datastructures.update import AtomicUpdate, Assignment, ChainedUpdate
 
 
 # a probabilistic control flow program (a restricted form of jani program)
@@ -12,7 +14,7 @@ class PCFP:
     _commands: [Command] = []
 
     # lower/upper bound for bounded integer variables only
-    _variable_bounds: Dict[sp.Variable, sp.Expression] = {}
+    _variable_bounds: Dict[sp.Variable, Tuple[sp.Expression, sp.Expression]] = {}
 
     # unique initial variable valuation for all variables
     _initial_values: Dict[sp.Variable, sp.Expression] = {}
@@ -26,6 +28,151 @@ class PCFP:
 
     # jani model this PCFP was originally constructed from, is used to export to jani again
     _original_jani: sp.JaniModel = None
+
+    def get_lower_bound(self, var: sp.Variable) -> sp.Expression:
+        return self._variable_bounds[var][0]
+
+    def get_upper_bound(self, var: sp.Variable) -> sp.Expression:
+        return self._variable_bounds[var][1]
+
+    def unfold(self, var: sp.Variable):
+        substitutions = [{var: val} for val in self.get_values_for_variable(var)]
+        new_commands = []
+        for subst in substitutions:
+            new_commands += filter(
+                lambda cmd: not cmd.is_guard_false(),  # only consider commands where guard has not evaluated to false
+                [cmd.substitute(subst) for cmd in self.commands]
+            )
+        self.commands = new_commands
+
+    # eliminates specified transition, see paper
+    def eliminate_transition(self, cmd: Command, dest: Command.Destination):
+        next_cmds = self.get_commands_with_source(dest.target_loc)
+        guards = [sp.Expression.And(cmd.guard, dest.update.wp(next_cmd.guard)).simplify() for next_cmd in next_cmds]
+        probabilities_list = [
+            [d.probability for d in cmd.destinations if d is not dest]
+            + [sp.Expression.Multiply(dest.probability, next_dest.probability).simplify() for next_dest in
+               next_cmd.destinations]
+            for next_cmd in next_cmds
+        ]
+        updates_list = [
+            [d.update for d in cmd.destinations if d is not dest]
+            + [next_dest.update.after(dest.update) for next_dest in next_cmd.destinations]
+            for next_cmd in next_cmds
+        ]
+        targets_list = [
+            [d.target_loc for d in cmd.destinations if d is not dest]
+            + [next_dest.target_loc for next_dest in next_cmd.destinations]
+            for next_cmd in next_cmds
+        ]
+        for guard, probabilities, updates, targets in zip(guards, probabilities_list, updates_list, targets_list):
+            # check if guard is SAT
+            solver = Z3SmtSolver(guard.manager)
+            guard: sp.Expression
+            solver.add(guard)
+            for var in guard.get_variables():
+                if var in self._undef_constants:
+                    continue
+                var: sp.Variable
+                lower_bound = sp.Expression.Geq(var.get_expression(), self.get_lower_bound(var))
+                upper_bound = sp.Expression.Leq(var.get_expression(), self.get_upper_bound(var))
+                solver.add(lower_bound)
+                solver.add(upper_bound)
+            solver.push()
+            if solver.check() == SmtCheckResult.Unsat:
+                print("smt solver returned UNSAT")
+                continue
+            destinations = [Command.Destination(p, u, t) for p, u, t in zip(probabilities, updates, targets)]
+            self._commands.append(Command(cmd.source_loc, guard, destinations))
+        # finally remove the input command
+        self._commands.remove(cmd)
+
+    # if loc has no self-loops then it will be unreachable after applying this function
+    def eliminate_loc(self, loc):
+        to_eliminate = self.get_destinations_with_target(loc)
+        while to_eliminate:
+            cmd, dest = to_eliminate.pop()  # only need one item of to_elimnate, so could be optimized
+            print("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
+            self.eliminate_transition(cmd, dest)
+            [print(cmd) for cmd in self._commands]
+            to_eliminate = self.get_destinations_with_target(loc)
+        for cmd in self.get_commands_with_source(loc):
+            self._commands.remove(cmd)
+
+    # list of all values (as sp.Expression) that the given variable (int/bool) can take
+    # will not work if undefined constants are in bounds
+    def get_values_for_variable(self, var: sp.Variable) -> [sp.Expression]:
+        exp_mgr: sp.ExpressionManager = self.get_manager()
+        if var.has_integer_type():
+            if var not in self._variable_bounds:
+                raise Exception("no bounds known for int variable {}".format(var.name))
+            bounds = self._variable_bounds[var]  # tuple of lower/upper bound
+            # check if variable bounds depend on undefined constants
+            if bounds[0].contains_variables() or bounds[1].contains_variables():
+                raise Exception("variable bounds contain constants")
+            lower_bound: int = bounds[0].evaluate_as_int()
+            upper_bound: int = bounds[1].evaluate_as_int()
+            # both bounds are inclusive
+            return [exp_mgr.create_integer(val) for val in range(lower_bound, upper_bound + 1)]
+        elif var.has_boolean_type():
+            return [exp_mgr.create_boolean(True), exp_mgr.create_boolean(False)]
+        else:
+            raise Exception("only int or boolean variables are supported")
+
+    def get_locs(self):
+        result = []
+        for cmd in self._commands:
+            if cmd.source_loc not in result:
+                result.append(cmd.source_loc)
+        return result
+
+    def get_locs_without_selfloops(self):
+        return [loc for loc in self.get_locs() if
+                all(map(lambda cmd: not cmd.has_selfloop(), self.get_commands_with_source(loc)))]
+
+    def get_commands_without_selfloops(self):
+        return [cmd for cmd in self._commands if not cmd.has_selfloop()]
+
+    def get_commands_with_source(self, source_loc):
+        return list(filter(
+            lambda cmd: are_locs_equal(source_loc, cmd.source_loc),
+            self._commands
+        ))
+
+    def get_destinations_with_target(self, target_loc):
+        result = []
+        for cmd in self._commands:
+            result += [(cmd, dest) for dest in cmd.destinations if are_locs_equal(dest.target_loc, target_loc)]
+        return result
+
+    def get_commands_with_nop_selfloop(self):
+        return [cmd for cmd in self._commands if cmd.has_nop_selfloop() and len(cmd.destinations) > 1]
+
+    def eliminate_nop_selfloops(self):
+        for cmd in self.get_commands_with_nop_selfloop():
+            if len(cmd.destinations) < 2:
+                continue
+            new_destinations = []
+            for dest in cmd.destinations:
+                if not dest.update.is_nop():
+                    new_destinations.append(dest)
+            cmd._destinations = new_destinations
+
+    def is_loc_possibly_initial(self, loc) -> bool:
+        for var in loc:
+            if loc[var] != self._initial_values[var]:
+                return False
+        return True
+
+    def remove_unreachable_locs(self):
+        raise NotImplementedError
+
+    @property
+    def commands(self):
+        return self._commands
+
+    def get_manager(self):
+        return self._original_jani.expression_manager
 
     def add_command(self, cmd: Command):
         self._commands.append(cmd)
@@ -45,6 +192,8 @@ class PCFP:
         new_instance = PCFP()
         new_instance._original_jani = jani_model
 
+        # TODO initial values
+
         # variable bounds
         for jani_var in jani_model.global_variables:
             jani_var: sp.JaniVariable
@@ -62,15 +211,24 @@ class PCFP:
         # commands
         for edge in automaton.edges:
             edge: sp.JaniEdge
-            source_loc = automaton.locations[edge.source_location_index]
+            #
+            if len(automaton.locations) == 1:
+                source_loc = {}  # if there is a unique location in jani then call it empty list
+            else:
+                raise Exception("jani model must have a unique location")
+                # source_loc = automaton.locations[edge.source_location_index]
             guard = edge.guard
             destinations = []
             for dest in edge.destinations:
-                target_loc = automaton.locations[dest.target_location_index]
+                if len(automaton.locations) == 1:
+                    target_loc = {}
+                else:
+                    # target_loc = automaton.locations[edge.target_location_index]
+                    raise Exception("jani model must have a unique location")
                 probability = dest.probability
                 update = AtomicUpdate()
                 for asg in dest.assignments:
-                    update.add_assignment(Assignment(asg.variable, asg.expression))
+                    update.add_assignment(Assignment(asg.variable.expression_variable, asg.expression))
                 destinations.append(Command.Destination(probability, update, target_loc))
             cmd = Command(source_loc, guard, destinations)
             new_instance.add_command(cmd)
@@ -80,6 +238,13 @@ class PCFP:
             new_instance._initial_locs.add(automaton.locations[index])
 
         return new_instance
+
+    # converts this PCFP to a PRISM program as string
+    def to_prism_string(self) -> str:
+        res = ""
+        for cmd in self._commands:
+            res += "{}\n".format(cmd.to_prism_string())
+        return res
 
     # builds a JaniModel from this PCFP instance
     def to_jani(self) -> sp.JaniModel:
@@ -127,7 +292,7 @@ class PCFP:
                 assignments = sp.JaniOrderedAssignments([])
                 if not isinstance(dest.update, AtomicUpdate):
                     raise NotImplementedError("transformation to jani not yet implemented for chained updates")
-                for asg in dest.update._par_assignments:
+                for asg in dest.update._parallel_asgs:
                     assignments.add(sp.JaniAssignment(asg.lhs, asg.rhs))
                 template_edge.add_destination(sp.JaniTemplateEdgeDestination(assignments))
 
@@ -140,3 +305,7 @@ class PCFP:
         if not jani_model.check_valid():
             logging.warning("exported jani model is not valid")
         return jani_model
+
+    @commands.setter
+    def commands(self, value):
+        self._commands = value
