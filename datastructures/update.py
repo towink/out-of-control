@@ -141,7 +141,7 @@ class AtomicUpdate(Update):
         other_update_map = other_update.to_subst_map()
         result = AtomicUpdate()
         for asg in other_update._parallel_asgs:
-            result.add_assignment(asg)
+            result.add_assignment(Assignment(asg.lhs, asg.rhs))
         for asg in self._parallel_asgs:
             result[asg.lhs] = asg.rhs.substitute(other_update_map).simplify()
         return result

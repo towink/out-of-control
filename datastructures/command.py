@@ -31,9 +31,14 @@ class Command:
             return " & ".join(["({}'={})".format(var.name, str(self.target_loc[var])) for var in self.target_loc])
 
         def to_prism_string(self) -> str:
-            return "{}: {} & {}".format(
+            if len(self.update._parallel_asgs) > 0:
+                delimiter = "&"
+            else:
+                delimiter = ""
+            return "{}: {} {} {}".format(
                 self.probability,
                 self.target_loc_to_prism_string(),
+                delimiter,
                 self.update.to_prism_string()
             )
 
