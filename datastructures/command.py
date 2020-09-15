@@ -73,7 +73,7 @@ class Command:
         return not self._guard.contains_variables() and self._guard.evaluate_as_bool() is False
 
     @property
-    def guard(self):
+    def guard(self) -> sp.Expression:
         return self._guard
 
     @property
@@ -81,7 +81,7 @@ class Command:
         return self._source_loc
 
     @property
-    def destinations(self):
+    def destinations(self) -> [Destination]:
         return self._destinations
 
     def __str__(self):

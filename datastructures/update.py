@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from typing import Dict
 
@@ -6,7 +7,7 @@ import stormpy as sp
 
 # assignment occurring in PCFP update
 class Assignment:
-    lhs: sp.Variable
+    lhs: sp.JaniBoundedIntegerVariable  # Perhaps it's neater to store a stormpy.variable object here?
     rhs: sp.Expression
 
     def __init__(self, lhs: sp.Variable, rhs: sp.Expression):
@@ -26,6 +27,13 @@ class Update:
 
     # weakest precondition with respect to the given predicate (postcondition)
     def wp(self, postcondition: sp.Expression) -> sp.Expression:
+        raise NotImplementedError
+
+    def apply(self, variable_values: Dict[sp.Variable, sp.Expression]) -> Dict[sp.Variable, sp.Expression]:
+        raise NotImplementedError
+
+    # Perhaps this should be named "substitute"?
+    def remove_variables(self, substitutions: Dict[sp.Variable, sp.Expression]) -> Update:
         raise NotImplementedError
 
     def flatten(self):
@@ -74,6 +82,27 @@ class AtomicUpdate(Update):
             substitutions[asg.lhs] = asg.rhs
         res = postcondition.substitute(substitutions).simplify()
         return res
+
+    def apply(self, variable_values: Dict[sp.Variable, sp.Expression]) -> Dict[sp.Variable, sp.Expression]:
+        new_values: Dict[sp.Variable, sp.Expression] = dict(variable_values)
+
+        for assignment in self._par_assignments:
+            if assignment.lhs.expression_variable in variable_values.keys():
+                rhs = assignment.rhs
+                new_rhs = rhs.substitute(variable_values).simplify()
+                new_values[assignment.lhs.expression_variable] = new_rhs
+
+        return new_values
+
+    def remove_variables(self, substitutions: Dict[sp.Variable, sp.Expression]) -> Update:
+        new_update = AtomicUpdate()
+        for assignment in self._par_assignments:
+            if assignment.lhs.expression_variable not in substitutions.keys():
+                new_rhs = assignment.rhs.substitute(substitutions).simplify()
+                new_assignment = Assignment(assignment.lhs, new_rhs)
+                new_update._par_assignments.append(new_assignment)
+
+        return new_update
 
     def is_idempotent(self):
         # safely approximate idempotency: each variable that is assigned to may not appear nowhere on the right

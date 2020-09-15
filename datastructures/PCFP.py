@@ -11,29 +11,37 @@ from datastructures.update import AtomicUpdate, Assignment, ChainedUpdate
 
 # a probabilistic control flow program (a restricted form of jani program)
 class PCFP:
-    _commands: [Command] = []
+    commands: [Command] = []
 
     # lower/upper bound for bounded integer variables only
-    _variable_bounds: Dict[sp.Variable, Tuple[sp.Expression, sp.Expression]] = {}
+    variable_bounds: Dict[sp.Variable, Tuple[sp.Expression, sp.Expression]] = {}
 
     # unique initial variable valuation for all variables
-    _initial_values: Dict[sp.Variable, sp.Expression] = {}
+    initial_values: Dict[sp.Variable, sp.Expression] = {}
 
     # initial locations
-    _initial_locs: {object} = set()
+    initial_locs: {object} = set()
 
     # all undefined constants, may appear in variable bounds, guards, probabilities, updates
     # TODO probably better to refer to orig jani for this
     _undef_constants: [sp.Variable] = []
 
     # jani model this PCFP was originally constructed from, is used to export to jani again
-    _original_jani: sp.JaniModel = None
+    original_jani: sp.JaniModel = None
+
+    def __init__(self, original_jani: sp.JaniModel):
+        self.commands = []
+        self.variable_bounds = {}
+        self.initial_values = {}
+        self.initial_locs = set()
+        self._undef_constants = []
+        self.original_jani = original_jani
 
     def get_lower_bound(self, var: sp.Variable) -> sp.Expression:
-        return self._variable_bounds[var][0]
+        return self.variable_bounds[var][0]
 
     def get_upper_bound(self, var: sp.Variable) -> sp.Expression:
-        return self._variable_bounds[var][1]
+        return self.variable_bounds[var][1]
 
     def unfold(self, var: sp.Variable):
         substitutions = [{var: val} for val in self.get_values_for_variable(var)]
@@ -104,9 +112,9 @@ class PCFP:
     def get_values_for_variable(self, var: sp.Variable) -> [sp.Expression]:
         exp_mgr: sp.ExpressionManager = self.get_manager()
         if var.has_integer_type():
-            if var not in self._variable_bounds:
+            if var not in self.variable_bounds:
                 raise Exception("no bounds known for int variable {}".format(var.name))
-            bounds = self._variable_bounds[var]  # tuple of lower/upper bound
+            bounds = self.variable_bounds[var]  # tuple of lower/upper bound
             # check if variable bounds depend on undefined constants
             if bounds[0].contains_variables() or bounds[1].contains_variables():
                 raise Exception("variable bounds contain constants")
@@ -160,7 +168,7 @@ class PCFP:
 
     def is_loc_possibly_initial(self, loc) -> bool:
         for var in loc:
-            if loc[var] != self._initial_values[var]:
+            if loc[var] != self.initial_values[var]:
                 return False
         return True
 
@@ -172,13 +180,13 @@ class PCFP:
         return self._commands
 
     def get_manager(self):
-        return self._original_jani.expression_manager
+        return self.original_jani.expression_manager
 
     def add_command(self, cmd: Command):
-        self._commands.append(cmd)
+        self.commands.append(cmd)
 
     def locations(self) -> {object}:
-        s = {cmd.source_loc for cmd in self._commands}
+        s = {cmd.source_loc for cmd in self.commands}
         return s
 
     # construct a PCFP object from a jani model
@@ -189,8 +197,7 @@ class PCFP:
         if len(jani_model.automata) > 1:
             logging.warning("jani models with multiple automata are not supported, ignoring all but first")
         automaton: sp.JaniAutomaton = jani_model.automata[0]
-        new_instance = PCFP()
-        new_instance._original_jani = jani_model
+        new_instance = PCFP(jani_model)
 
         # TODO initial values
 
@@ -199,10 +206,11 @@ class PCFP:
             jani_var: sp.JaniVariable
             if type(jani_var) is not sp.JaniBoundedIntegerVariable:
                 continue
-            var = jani_var.expression_variable
+            var: sp.Variable = jani_var.expression_variable
             lower_bound = jani_var.lower_bound
             upper_bound = jani_var.upper_bound
-            new_instance._variable_bounds[var] = (lower_bound, upper_bound)
+            new_instance.variable_bounds[var] = (lower_bound, upper_bound)
+            new_instance.initial_values[var] = jani_var.init_expression
 
         # undefined constants
         for constant in jani_model.constants:
@@ -235,7 +243,7 @@ class PCFP:
 
         # initial locations
         for index in automaton.initial_location_indices:
-            new_instance._initial_locs.add(automaton.locations[index])
+            new_instance.initial_locs.add(automaton.locations[index])
 
         return new_instance
 
@@ -249,9 +257,9 @@ class PCFP:
     # builds a JaniModel from this PCFP instance
     def to_jani(self) -> sp.JaniModel:
         # construct resulting jani model using the original jani model
-        if self._original_jani is None:
+        if self.original_jani is None:
             raise Exception("can only export to jani if PCFP was constructed with from_jani(...)")
-        jani_model: sp.JaniModel = self._original_jani
+        jani_model: sp.JaniModel = self.original_jani
         automaton = sp.JaniAutomaton("from PCFP", jani_model.automata[0].location_variable)
 
         # set (undefined) constants, remove old first
@@ -274,12 +282,12 @@ class PCFP:
             automaton.add_location(sp.JaniLocation(name, assignments))
 
         # initial locations
-        for initial_loc in self._initial_locs:
+        for initial_loc in self.initial_locs:
             initial_loc_index = location_list.index(initial_loc)
             automaton.add_initial_location(initial_loc_index)
 
         # commands/edges
-        for cmd in self._commands:
+        for cmd in self.commands:
             cmd: Command
             source_loc_index = location_list.index(cmd.source_loc)
             # for each edge we need a template edge that contains guard and destinations

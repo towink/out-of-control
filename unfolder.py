@@ -1,6 +1,9 @@
 import stormpy
 from typing import Dict
-import pycarl.gmp
+from datastructures.PCFP import PCFP
+
+from datastructures.command import Command
+from datastructures.update import AtomicUpdate, Assignment
 
 
 class VariableInfo:
@@ -49,107 +52,79 @@ def get_index_in_dictionary_list(list: [Dict], search: Dict) -> int:
     return -1
 
 
-def unfold(old_model: stormpy.JaniModel, elimination_names: [str]) -> stormpy.JaniModel:
+def unfold(old_model: PCFP, base_jani_model: stormpy.JaniModel, elimination_names: [str]) -> PCFP:
+    """
+
+    :rtype: object
+    """
     # Based on this: https://github.com/moves-rwth/storm/blob/master/src/storm/storage/jani/JaniLocationExpander.cpp
     # but with support for unfolding multiple variables at the same time
 
-
-
-    if len(old_model.automata) != 1:
-        raise Exception("Can only unfold models that have exactly one automaton. Please flatten the model first")
-    old_automaton: stormpy.JaniAutomaton = old_model.automata[0]
-
-    new_model: stormpy.JaniModel = stormpy.JaniModel(old_model)
-    new_automaton: stormpy.JaniAutomaton = stormpy.JaniAutomaton(old_automaton.name, old_automaton.location_variable)
+    new_model: PCFP = PCFP(base_jani_model)
 
     # Remove variables from model and father information on the values each one can assume:
-    elimination_info = eliminate_variables(elimination_names, old_model.expression_manager, old_model, new_model)
+    elimination_info = eliminate_variables(elimination_names, base_jani_model.expression_manager, old_model, new_model)
     # Generate all possible combinations of values the eliminated variables can assume:
     variable_combinations = build_variable_combinations(elimination_info)
+    variable_combination_names: [str] = []
+    for var_comb in variable_combinations:
+        name = ""
+        for var, val in var_comb.items():
+            name += var.name + "=" + str(val) + ";"
+        variable_combination_names.append(name)
 
-    # Each location will turn into len(variable_combinations) new locations. The indices of these new locations are
-    # stored in this list. Each list entry corresponds to a value combination and is a dictionary that maps old location
-    # indices to new location indices
-    new_location_indices: [Dict[int, int]] = [dict() for _ in variable_combinations]
-
-    loc: stormpy.JaniLocation
-    for loc in old_automaton.locations:
-        if loc.assignments is not None:
-            raise Exception("Location assignments are not supported")
-
-        for i, variable_combination in enumerate(variable_combinations):
-            loc_name: str = loc.name
-            key: stormpy.Variable
-            value: stormpy.Expression
-            for key, value in variable_combination.items():
-                loc_name += "; " + str(key.name) + "=" + str(value)
-
-            new_loc = stormpy.JaniLocation(loc_name, stormpy.JaniOrderedAssignments([]))
-
-            index = new_automaton.add_location(new_loc)
-            old_index = old_automaton.get_location_index(loc.name)
-            new_location_indices[i][old_index] = index
-
-            if old_index in old_automaton.initial_location_indices:
-                if is_variable_combination_initial(elimination_info, variable_combination):
-                    new_automaton.add_initial_location(index)
-
-    old_edge: stormpy.JaniEdge
-    for old_edge in old_automaton.edges:
-        for i, variable_combination in enumerate(variable_combinations):
-            guard: stormpy.Expression = old_edge.guard.substitute(variable_combination).simplify()
-
-            # Skip edges where the guard evaluates to false
-            if not guard.contains_variables() and not guard.evaluate_as_bool():
-                continue
-
-            template_edge: stormpy.JaniTemplateEdge = stormpy.JaniTemplateEdge(guard)
-            destination_indices_and_probabilities: [(int, stormpy.Expression)] = []
-
-            out_of_bounds: bool = False  # Tracks whether a destination is out of bounds.
-
-            destination: stormpy.JaniEdgeDestination
-            for destination in old_edge.destinations:
-                assignments: stormpy.JaniOrderedAssignments = destination.assignments.clone()
-                assignments.substitute(variable_combination)
-
-                new_assignments = stormpy.JaniOrderedAssignments([])
-
-                new_variable_values = dict(variable_combination)
-
-                assignment: stormpy.JaniAssignment
-                for assignment in assignments:
-                    variable: stormpy.JaniVariable = assignment.variable
-                    if variable.name in elimination_names:
-                        expression: stormpy.Expression = assignment.expression
-                        if expression.contains_variables():
-                            raise Exception("Cannot unfold variable " + variable.name + ".")
-                        new_variable_values[variable.expression_variable] = expression
-                    else:
-                        new_assignments.add(assignment)
-
-                template_edge_destination: stormpy.JaniTemplateEdgeDestination = stormpy.JaniTemplateEdgeDestination(new_assignments)
-                template_edge.add_destination(template_edge_destination)
-
-                destination_index: int = get_index_in_dictionary_list(variable_combinations, new_variable_values)
-                if destination_index == -1:
-                    print("WARNING: A variable bound was violated and the edge omitted from the model")
-                    out_of_bounds = True
+    def get_new_location(old_location: object, variable_combination: Dict[stormpy.Variable, stormpy.Expression]):
+        if len(variable_combination) != len(elimination_info):
+            raise Exception("To get the new location, all variable assignments have to be specified")
+        for (i, candidate) in enumerate(variable_combinations):
+            match = True
+            for var in candidate:
+                cand_value = candidate[var].evaluate_as_int()
+                comb_value = variable_combination[var].evaluate_as_int()
+                if cand_value != comb_value:
+                    match = False
                     break
+            if match:
+                return old_location, variable_combination_names[i]
+        raise Exception("The variables are out of bound")
 
-                probability_expression: stormpy.Expression = destination.probability
-                probability_expression = probability_expression.substitute(variable_combination).simplify()
-                destination_indices_and_probabilities.append((destination_index, probability_expression))
+    # Set the initial locations:
 
-            if out_of_bounds:  # Don't add edges where a destination was out of bounds
+    initial_variable_combination = {}
+    for variable_info in elimination_info:
+        initial_variable_combination[variable_info.variable] = variable_info.init_expression
+    for old_initial_loc in old_model.initial_locs:
+        new_initial_loc = get_new_location(old_initial_loc, initial_variable_combination)
+        new_model.initial_locs.add(new_initial_loc)
+
+    for command in old_model.commands:
+        for (i, variable_combination) in enumerate(variable_combinations):
+            new_source_loc = get_new_location(command.source_loc, variable_combination)
+
+            new_guard = command.guard.substitute(variable_combination).simplify()
+
+            # Skip commands where the guard evaluates to false
+            if not new_guard.contains_variables() and not new_guard.evaluate_as_bool():
                 continue
 
-            edge_start_index = new_location_indices[i][old_edge.source_location_index]
-            new_edge: stormpy.JaniEdge = stormpy.JaniEdge(edge_start_index, old_edge.action_index, old_edge.rate, template_edge, destination_indices_and_probabilities)
-            new_automaton.add_edge(new_edge)
+            new_destinations: [Command.Destination] = []
+            for old_destination in command.destinations:
+                old_destination: Command.Destination
 
-    # As new_model is a copy of the existing model, we need to replace the automaton with the new one:
-    new_model.replace_automaton(0, new_automaton)
+                new_prob = old_destination.probability.substitute(variable_combination).simplify()
+                # TODO: Skip destination if probability is zero
+
+                new_values = old_destination.update.apply(variable_combination)
+                new_target_loc = get_new_location(old_destination.target_loc, new_values)
+
+                new_update = old_destination.update.remove_variables(variable_combination)
+
+                new_destination = Command.Destination(new_prob, new_update, new_target_loc)
+                new_destinations.append(new_destination)
+
+            new_command: Command = Command(new_source_loc, new_guard, new_destinations)
+            new_model.add_command(new_command)
+
     return new_model
 
 
@@ -165,30 +140,31 @@ def is_variable_combination_initial(elimination_info, value_combination):
     return is_initial
 
 
-def eliminate_variables(elimination_names, expression_manager, model, new_model):
+def eliminate_variables(elimination_names: [str], expression_manager: stormpy.ExpressionManager, model: PCFP, new_model: PCFP):
     elimination_info: [VariableInfo] = []
     var: stormpy.JaniBoundedIntegerVariable
-    for var in model.global_variables:
-        # This crashes if var is not a bounded integer variable. TODO: Add a check for this
-        # Adding support for bools should not be difficult
-        lower_bound: int = var.lower_bound.evaluate_as_int()
-        upper_bound: int = var.upper_bound.evaluate_as_int()
-        init_expression: stormpy.Expression = var.init_expression
-        init_expression_value: int = init_expression.evaluate_as_int()
+    for var in model.variable_bounds:
 
-        print("Variable " + var.name + ": Range [" + str(lower_bound) + "," + str(upper_bound) + "], Init Value " + str(
-            init_expression_value))
+        lower_bound, upper_bound = model.variable_bounds[var]
+        lower_bound: stormpy.Expression
+        upper_bound: stormpy.Expression
+
+        init_expression = model.initial_values[var]
 
         if var.name in elimination_names:
-            print("The variable will be unfolded")
-            values = [expression_manager.create_integer(val) for val in range(lower_bound, upper_bound)]
-            elimination_info.append(VariableInfo(var.expression_variable, init_expression, values))
-            new_model.global_variables.erase_variable(var.expression_variable)
+            if lower_bound.contains_variables() or upper_bound.contains_variables():
+                raise Exception("Cannot unfold because the bounds aren't a constant")
+            if init_expression.contains_variables():
+                # This might not actually be a problem?
+                raise Exception("Cannot unfold because the initial value isn't a constant")
+
+            lower_bound_value, upper_bound_value = lower_bound.evaluate_as_int(), upper_bound.evaluate_as_int()
+
+            values = [expression_manager.create_integer(val) for val in range(lower_bound_value, upper_bound_value)]
+            elimination_info.append(VariableInfo(var, init_expression, values))
+
         else:
-            print("The variable will not be unfolded")
+            new_model.variable_bounds[var] = (lower_bound, upper_bound)
+            new_model.initial_values[var] = init_expression
 
-        print("")
     return elimination_info
-
-
-
