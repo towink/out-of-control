@@ -7,7 +7,7 @@ import stormpy as sp
 
 # assignment occurring in PCFP update
 class Assignment:
-    lhs: sp.JaniBoundedIntegerVariable  # Perhaps it's neater to store a stormpy.variable object here?
+    lhs: sp.Variable  # Perhaps it's neater to store a stormpy.variable object here?
     rhs: sp.Expression
 
     def __init__(self, lhs: sp.Variable, rhs: sp.Expression):
@@ -75,7 +75,7 @@ class AtomicUpdate(Update):
     def rhs_expressions(self) -> {sp.Expression}:
         return set(map(lambda asg: asg.rhs, self._parallel_asgs))
 
-    def wp(self, postcondition):
+    def wp(self, postcondition: sp.Expression):
         debug = str(postcondition)
         substitutions = {}
         for asg in self._parallel_asgs:
@@ -86,7 +86,7 @@ class AtomicUpdate(Update):
     def apply(self, variable_values: Dict[sp.Variable, sp.Expression]) -> Dict[sp.Variable, sp.Expression]:
         new_values: Dict[sp.Variable, sp.Expression] = dict(variable_values)
 
-        for assignment in self._par_assignments:
+        for assignment in self._parallel_asgs:
             if assignment.lhs.expression_variable in variable_values.keys():
                 rhs = assignment.rhs
                 new_rhs = rhs.substitute(variable_values).simplify()
@@ -96,11 +96,11 @@ class AtomicUpdate(Update):
 
     def remove_variables(self, substitutions: Dict[sp.Variable, sp.Expression]) -> Update:
         new_update = AtomicUpdate()
-        for assignment in self._par_assignments:
+        for assignment in self._parallel_asgs:
             if assignment.lhs.expression_variable not in substitutions.keys():
                 new_rhs = assignment.rhs.substitute(substitutions).simplify()
                 new_assignment = Assignment(assignment.lhs, new_rhs)
-                new_update._par_assignments.append(new_assignment)
+                new_update._parallel_asgs.append(new_assignment)
 
         return new_update
 

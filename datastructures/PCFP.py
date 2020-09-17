@@ -59,7 +59,8 @@ class PCFP:
         guards = [sp.Expression.And(cmd.guard, dest.update.wp(next_cmd.guard)).simplify() for next_cmd in next_cmds]
         probabilities_list = [
             [d.probability for d in cmd.destinations if d is not dest]
-            + [sp.Expression.Multiply(dest.probability, next_dest.probability).simplify() for next_dest in
+            # reuse wp here to substitute variables in probability expression
+            + [sp.Expression.Multiply(dest.probability, dest.update.wp(next_dest.probability)).simplify() for next_dest in
                next_cmd.destinations]
             for next_cmd in next_cmds
         ]
