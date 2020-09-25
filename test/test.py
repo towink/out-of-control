@@ -2,11 +2,11 @@ import stormpy as sp
 
 import logging
 
-from datastructures.PCFP import PCFP
+from locelim.datastructures.PCFP import PCFP
 
 
 def test_PCFP_to_jani_from_jani():
-    path = "../examples/nand_simple.prism"
+    path = "../locelim/examples/nand_simple.prism"
     logging.info("loading model {}".format(path))
     prism_program: sp.PrismProgram = sp.parse_prism_program(path)
     prism_props: sp.core.Property = sp.parse_properties_for_prism_program("P=? [F x>=20]", prism_program)
