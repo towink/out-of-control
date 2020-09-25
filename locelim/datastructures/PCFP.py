@@ -1,12 +1,11 @@
 from typing import Dict, Tuple
 import logging
 
-import stormpy as sp
 from stormpy.utility import Z3SmtSolver, SmtCheckResult
 
-from datastructures.command import Command
-from datastructures.util import *
-from datastructures.update import AtomicUpdate, Assignment, ChainedUpdate
+from locelim.datastructures.command import Command
+from locelim.datastructures.util import *
+from locelim.datastructures.update import AtomicUpdate, Assignment
 
 
 # a probabilistic control flow program (a restricted form of jani program)
@@ -15,6 +14,9 @@ class PCFP:
 
     # lower/upper bound for bounded integer variables only
     variable_bounds: Dict[sp.Variable, Tuple[sp.Expression, sp.Expression]] = {}
+
+    # the boolean variables, they don't need bounds
+    boolean_variables: [sp.Variable] = []
 
     # unique initial variable valuation for all variables
     initial_values: Dict[sp.Variable, sp.Expression] = {}
@@ -80,7 +82,7 @@ class PCFP:
             guard: sp.Expression
             solver.add(guard)
             for var in guard.get_variables():
-                if var in self._undef_constants:
+                if var in self._undef_constants or var.has_boolean_type():
                     continue
                 var: sp.Variable
                 lower_bound = sp.Expression.Geq(var.get_expression(), self.get_lower_bound(var))
@@ -89,7 +91,7 @@ class PCFP:
                 solver.add(upper_bound)
             solver.push()
             if solver.check() == SmtCheckResult.Unsat:
-                print("smt solver returned UNSAT")
+                #print("smt solver returned UNSAT")
                 continue
             destinations = [Command.Destination(p, u, t) for p, u, t in zip(probabilities, updates, targets)]
             self._commands.append(Command(cmd.source_loc, guard, destinations))
@@ -101,7 +103,7 @@ class PCFP:
         to_eliminate = self.get_destinations_with_target(loc)
         while to_eliminate:
             cmd, dest = to_eliminate.pop()  # only need one item of to_elimnate, so could be optimized
-            print("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
+            # print("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
             self.eliminate_transition(cmd, dest)
             #[print(cmd) for cmd in self._commands]
             to_eliminate = self.get_destinations_with_target(loc)
@@ -139,6 +141,17 @@ class PCFP:
         return [loc for loc in self.get_locs() if
                 all(map(lambda cmd: not cmd.has_selfloop(), self.get_commands_with_source(loc)))]
 
+    # the locations that have no self loops, are not possibly initial or final
+    def get_eliminable_locs(self, target_predicate: sp.Expression) -> []:
+        result = []
+        for loc in self.get_locs_without_selfloops():
+            solver = Z3SmtSolver(target_predicate.manager)
+            solver.add(target_predicate.substitute(loc))
+            solver.push()
+            if not self.is_loc_possibly_initial(loc) and solver.check() == SmtCheckResult.Unsat:
+                result.append(loc)
+        return result
+
     def get_commands_without_selfloops(self):
         return [cmd for cmd in self._commands if not cmd.has_selfloop()]
 
@@ -169,7 +182,7 @@ class PCFP:
 
     def is_loc_possibly_initial(self, loc) -> bool:
         for var in loc:
-            if loc[var] != self.initial_values[var]:
+            if loc[var].evaluate_as_int() != self.initial_values[var].evaluate_as_int():
                 return False
         return True
 
@@ -205,13 +218,17 @@ class PCFP:
         # variable bounds
         for jani_var in jani_model.global_variables:
             jani_var: sp.JaniVariable
-            if type(jani_var) is not sp.JaniBoundedIntegerVariable:
-                continue
-            var: sp.Variable = jani_var.expression_variable
-            lower_bound = jani_var.lower_bound
-            upper_bound = jani_var.upper_bound
-            new_instance.variable_bounds[var] = (lower_bound, upper_bound)
-            new_instance.initial_values[var] = jani_var.init_expression
+            if type(jani_var) is sp.JaniBoundedIntegerVariable:
+                var: sp.Variable = jani_var.expression_variable
+                lower_bound = jani_var.lower_bound
+                upper_bound = jani_var.upper_bound
+                new_instance.variable_bounds[var] = (lower_bound, upper_bound)
+                new_instance.initial_values[var] = jani_var.init_expression
+            elif jani_var.expression_variable.has_boolean_type():
+                new_instance.boolean_variables.append(jani_var.expression_variable)
+            else:
+                #raise Exception("variable type not supported")
+                logging.warning("unsupported variable: {}".format(jani_var.name))
 
         # undefined constants
         for constant in jani_model.constants:
@@ -260,6 +277,9 @@ class PCFP:
 
         for var in self.variable_bounds:
             res += "\t{}: [{}..{}];\n".format(var.name, self.get_lower_bound(var), self.get_upper_bound(var))
+
+        for var in self.boolean_variables:
+            res += "\t{}: bool;\n".format(var.name)
 
         for cmd in self._commands:
             res += "\t{}\n".format(cmd.to_prism_string())

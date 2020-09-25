@@ -1,9 +1,8 @@
 import stormpy
 from typing import Dict
-from datastructures.PCFP import PCFP
+from locelim.datastructures.PCFP import PCFP
 
-from datastructures.command import Command
-from datastructures.update import AtomicUpdate, Assignment
+from locelim.datastructures.command import Command
 
 
 class VariableInfo:

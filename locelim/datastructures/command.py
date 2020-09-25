@@ -1,10 +1,8 @@
 from typing import Dict
 
-import stormpy as sp
+from locelim.datastructures.update import Update
 
-from datastructures.update import Update
-
-from datastructures.util import *
+from locelim.datastructures.util import *
 
 
 # represent a PCFP command (corresponds to jani edge)

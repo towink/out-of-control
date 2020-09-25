@@ -1,6 +1,7 @@
 import stormpy
 from unfolder import unfold
-from datastructures import PCFP
+from locelim.datastructures import PCFP
+
 
 # There seems to be a problem when modifying a jani model in stormpy and then building it.
 # Exporting to json and parsing again may help.
@@ -11,7 +12,7 @@ def export_and_parse_jani(jani_model):
     return jani_model
 
 def main():
-    path = "examples/coin_game_with_ints.prism"
+    path = "locelim/examples/coin_game_with_ints.prism"
 
     prism_program: stormpy.PrismProgram = stormpy.parse_prism_program(path)
     prism_props: stormpy.core.Property = stormpy.parse_properties_for_prism_program("P=? [F x>=20]", prism_program)
