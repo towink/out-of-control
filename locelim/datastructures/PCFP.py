@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, Tuple
 import logging
 
@@ -39,6 +40,15 @@ class PCFP:
         self._undef_constants = []
         self.original_jani = original_jani
 
+    def copy(self):
+        new_pcfp = PCFP(self.original_jani)
+        new_pcfp.commands = list.copy(self.commands)
+        new_pcfp.variable_bounds = dict.copy(self.variable_bounds)
+        new_pcfp.initial_values = dict.copy(self.initial_values)
+        new_pcfp.initial_locs = set.copy(self.initial_locs)
+        new_pcfp._undef_constants = list.copy(self._undef_constants)
+        return new_pcfp
+
     def get_lower_bound(self, var: sp.Variable) -> sp.Expression:
         return self.variable_bounds[var][0]
 
@@ -56,7 +66,7 @@ class PCFP:
         self.commands = new_commands
 
     # eliminates specified transition, see paper
-    def eliminate_transition(self, cmd: Command, dest: Command.Destination):
+    def eliminate_transition(self, cmd: Command, dest: Command.Destination, silent=False):
         next_cmds = self.get_commands_with_source(dest.target_loc)
         guards = [sp.Expression.And(cmd.guard, dest.update.wp(next_cmd.guard)).simplify() for next_cmd in next_cmds]
         probabilities_list = [
@@ -78,11 +88,14 @@ class PCFP:
         ]
         for guard, probabilities, updates, targets in zip(guards, probabilities_list, updates_list, targets_list):
             # check if guard is SAT
+
             solver = Z3SmtSolver(guard.manager)
             guard: sp.Expression
             solver.add(guard)
             for var in guard.get_variables():
                 if var in self._undef_constants or var.has_boolean_type():
+                    continue
+                if not var in self.variable_bounds:
                     continue
                 var: sp.Variable
                 lower_bound = sp.Expression.Geq(var.get_expression(), self.get_lower_bound(var))
@@ -91,7 +104,8 @@ class PCFP:
                 solver.add(upper_bound)
             solver.push()
             if solver.check() == SmtCheckResult.Unsat:
-                #print("smt solver returned UNSAT")
+                if not silent:
+                    print("smt solver returned UNSAT")
                 continue
             destinations = [Command.Destination(p, u, t) for p, u, t in zip(probabilities, updates, targets)]
             self._commands.append(Command(cmd.source_loc, guard, destinations))
@@ -99,16 +113,59 @@ class PCFP:
         self._commands.remove(cmd)
 
     # if loc has no self-loops then it will be unreachable after applying this function
-    def eliminate_loc(self, loc):
+    def eliminate_loc(self, loc, silent=False):
         to_eliminate = self.get_destinations_with_target(loc)
         while to_eliminate:
             cmd, dest = to_eliminate.pop()  # only need one item of to_elimnate, so could be optimized
-            # print("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
-            self.eliminate_transition(cmd, dest)
+            if not silent:
+                print("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
+            self.eliminate_transition(cmd, dest, silent)
             #[print(cmd) for cmd in self._commands]
             to_eliminate = self.get_destinations_with_target(loc)
         for cmd in self.get_commands_with_source(loc):
            self._commands.remove(cmd)
+
+    def eliminate_unreachable(self):
+        reachable = [self.get_initial_location()]
+
+        def is_in_reachable(loc):
+            for r in reachable:
+                if are_locs_equal(r, loc):
+                    return True
+            return False
+
+        current_index = 0
+        while current_index < len(reachable):
+            cmds = self.get_commands_with_source(reachable[current_index])
+
+            for cmd in cmds:
+                for dest in cmd.destinations:
+                    if not is_in_reachable(dest.target_loc):
+                        reachable.append(dest.target_loc)
+
+            current_index += 1
+
+        new_commands = []
+        for cmd in self.commands:
+            if is_in_reachable(cmd.source_loc):
+                new_commands.append(cmd)
+
+        self.commands = new_commands
+
+    def get_initial_location(self):
+        locs = self.get_locs()
+        for loc in locs:
+            is_initial = True
+            for var in loc:
+                loc_val: sp.Expression = loc[var]
+                init_val: sp.Expression = self.initial_values[var]
+                eq = sp.Expression.Eq(loc_val, init_val)
+                if not eq.evaluate_as_bool():
+                    is_initial = False
+                    break
+            if is_initial:
+                return loc
+        raise Exception("Could not find initial location. Perhaps it was eliminated?")
 
     # list of all values (as sp.Expression) that the given variable (int/bool) can take
     # will not work if undefined constants are in bounds
@@ -198,10 +255,6 @@ class PCFP:
 
     def add_command(self, cmd: Command):
         self.commands.append(cmd)
-
-    def locations(self) -> {object}:
-        s = {cmd.source_loc for cmd in self.commands}
-        return s
 
     # construct a PCFP object from a jani model
     @classmethod
