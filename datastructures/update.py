@@ -87,17 +87,17 @@ class AtomicUpdate(Update):
         new_values: Dict[sp.Variable, sp.Expression] = dict(variable_values)
 
         for assignment in self._parallel_asgs:
-            if assignment.lhs.expression_variable in variable_values.keys():
+            if assignment.lhs in variable_values.keys():
                 rhs = assignment.rhs
                 new_rhs = rhs.substitute(variable_values).simplify()
-                new_values[assignment.lhs.expression_variable] = new_rhs
+                new_values[assignment.lhs] = new_rhs
 
         return new_values
 
     def remove_variables(self, substitutions: Dict[sp.Variable, sp.Expression]) -> Update:
         new_update = AtomicUpdate()
         for assignment in self._parallel_asgs:
-            if assignment.lhs.expression_variable not in substitutions.keys():
+            if assignment.lhs not in substitutions.keys():
                 new_rhs = assignment.rhs.substitute(substitutions).simplify()
                 new_assignment = Assignment(assignment.lhs, new_rhs)
                 new_update._parallel_asgs.append(new_assignment)
