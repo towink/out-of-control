@@ -1,1 +1,0 @@
- ~/storm/build/bin/storm --prism coin_game.prism --constants N=10000 --prop "P=? [F x>=N]" --engine sparse  

@@ -14,7 +14,7 @@ class PCFP:
     commands: [Command] = []
 
     # lower/upper bound for bounded integer variables only
-    variable_bounds: Dict[sp.Variable, Tuple[sp.Expression, sp.Expression]] = {}
+    int_variables_bounds: Dict[sp.Variable, Tuple[sp.Expression, sp.Expression]] = {}
 
     # the boolean variables, they don't need bounds
     boolean_variables: [sp.Variable] = []
@@ -34,7 +34,7 @@ class PCFP:
 
     def __init__(self, original_jani: sp.JaniModel):
         self.commands = []
-        self.variable_bounds = {}
+        self.int_variables_bounds = {}
         self.initial_values = {}
         self.initial_locs = set()
         self._undef_constants = []
@@ -43,20 +43,24 @@ class PCFP:
     def copy(self):
         new_pcfp = PCFP(self.original_jani)
         new_pcfp.commands = list.copy(self.commands)
-        new_pcfp.variable_bounds = dict.copy(self.variable_bounds)
+        new_pcfp.int_variables_bounds = dict.copy(self.int_variables_bounds)
         new_pcfp.initial_values = dict.copy(self.initial_values)
         new_pcfp.initial_locs = set.copy(self.initial_locs)
         new_pcfp._undef_constants = list.copy(self._undef_constants)
         return new_pcfp
 
     def get_lower_bound(self, var: sp.Variable) -> sp.Expression:
-        return self.variable_bounds[var][0]
+        return self.int_variables_bounds[var][0]
 
     def get_upper_bound(self, var: sp.Variable) -> sp.Expression:
-        return self.variable_bounds[var][1]
+        return self.int_variables_bounds[var][1]
+
+    def count_destinations(self):
+        return sum([cmd.count_destinations() for cmd in self._commands])
 
     def unfold(self, var: sp.Variable):
         substitutions = [{var: val} for val in self.get_values_for_variable(var)]
+        logging.info("unfolding {} will create {} new locations".format(var.name, (len(substitutions) - 1) * len(self.get_locs())))
         new_commands = []
         for subst in substitutions:
             new_commands += filter(
@@ -64,6 +68,8 @@ class PCFP:
                 [cmd.substitute(subst) for cmd in self.commands]
             )
         self.commands = new_commands
+        self.eliminate_unreachable()
+        logging.info("finished unfolding, there are now {} locations".format(len(self.get_locs())))
 
     # eliminates specified transition, see paper
     def eliminate_transition(self, cmd: Command, dest: Command.Destination, silent=False):
@@ -95,7 +101,7 @@ class PCFP:
             for var in guard.get_variables():
                 if var in self._undef_constants or var.has_boolean_type():
                     continue
-                if not var in self.variable_bounds:
+                if not var in self.int_variables_bounds:
                     continue
                 var: sp.Variable
                 lower_bound = sp.Expression.Geq(var.get_expression(), self.get_lower_bound(var))
@@ -120,13 +126,13 @@ class PCFP:
             if not silent:
                 print("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
             self.eliminate_transition(cmd, dest, silent)
-            #[print(cmd) for cmd in self._commands]
             to_eliminate = self.get_destinations_with_target(loc)
         for cmd in self.get_commands_with_source(loc):
            self._commands.remove(cmd)
 
     def eliminate_unreachable(self):
-        reachable = [self.get_initial_location()]
+        #reachable = [self.get_initial_location()]
+        reachable = [loc for loc in self.get_locs() if self.is_loc_possibly_initial(loc)]
 
         def is_in_reachable(loc):
             for r in reachable:
@@ -150,6 +156,8 @@ class PCFP:
             if is_in_reachable(cmd.source_loc):
                 new_commands.append(cmd)
 
+        logging.info("{} unreachable locations were removed".format(len(self.get_locs()) - len(reachable)))
+
         self.commands = new_commands
 
     def get_initial_location(self):
@@ -172,9 +180,9 @@ class PCFP:
     def get_values_for_variable(self, var: sp.Variable) -> [sp.Expression]:
         exp_mgr: sp.ExpressionManager = self.get_manager()
         if var.has_integer_type():
-            if var not in self.variable_bounds:
+            if var not in self.int_variables_bounds:
                 raise Exception("no bounds known for int variable {}".format(var.name))
-            bounds = self.variable_bounds[var]  # tuple of lower/upper bound
+            bounds = self.int_variables_bounds[var]  # tuple of lower/upper bound
             # check if variable bounds depend on undefined constants
             if bounds[0].contains_variables() or bounds[1].contains_variables():
                 raise Exception("variable bounds contain constants")
@@ -201,8 +209,8 @@ class PCFP:
     # the locations that have no self loops, are not possibly initial or final
     def get_eliminable_locs(self, target_predicate: sp.Expression) -> []:
         result = []
+        solver = Z3SmtSolver(target_predicate.manager)
         for loc in self.get_locs_without_selfloops():
-            solver = Z3SmtSolver(target_predicate.manager)
             solver.add(target_predicate.substitute(loc))
             solver.push()
             if not self.is_loc_possibly_initial(loc) and solver.check() == SmtCheckResult.Unsat:
@@ -239,7 +247,7 @@ class PCFP:
 
     def is_loc_possibly_initial(self, loc) -> bool:
         for var in loc:
-            if loc[var].evaluate_as_int() != self.initial_values[var].evaluate_as_int():
+            if exp_to_primitive_type(loc[var]) != exp_to_primitive_type(self.initial_values[var]):
                 return False
         return True
 
@@ -266,33 +274,31 @@ class PCFP:
         automaton: sp.JaniAutomaton = jani_model.automata[0]
         new_instance = PCFP(jani_model)
 
-        # TODO initial values
-
         # variable bounds
         for jani_var in jani_model.global_variables:
-            jani_var: sp.JaniVariable
+            var = jani_var.expression_variable
+            new_instance.initial_values[var] = jani_var.init_expression
             if type(jani_var) is sp.JaniBoundedIntegerVariable:
-                var: sp.Variable = jani_var.expression_variable
                 lower_bound = jani_var.lower_bound
                 upper_bound = jani_var.upper_bound
-                new_instance.variable_bounds[var] = (lower_bound, upper_bound)
-                new_instance.initial_values[var] = jani_var.init_expression
-            elif jani_var.expression_variable.has_boolean_type():
-                new_instance.boolean_variables.append(jani_var.expression_variable)
+                new_instance.int_variables_bounds[var] = (lower_bound, upper_bound)
+            elif var.has_boolean_type():
+                new_instance.boolean_variables.append(var)
             else:
-                #raise Exception("variable type not supported")
                 logging.warning("unsupported variable: {}".format(jani_var.name))
 
         # undefined constants
         for constant in jani_model.constants:
-            new_instance._undef_constants.append(constant.expression_variable)
+            # the defined constants (e.g. const int N=5 in prism) are substituted in jani model, so ignore them
+            if not constant.defined:
+                new_instance._undef_constants.append(constant.expression_variable)
 
         # commands
         for edge in automaton.edges:
             edge: sp.JaniEdge
             #
             if len(automaton.locations) == 1:
-                source_loc = {}  # if there is a unique location in jani then call it empty list
+                source_loc = {}  # if there is a unique location in jani then call it empty dict
             else:
                 raise Exception("jani model must have a unique location")
                 # source_loc = automaton.locations[edge.source_location_index]
@@ -321,18 +327,19 @@ class PCFP:
     # converts this PCFP to a PRISM program as string
     def to_prism_string(self) -> str:
         res = "\n//AUTOGENERATED FILE FROM PCFP\n"
-        res += "dtmc\n"
+        res += "mdp\n"
 
         for const in self._undef_constants:
             res += "const int {};\n".format(const.name)
 
         res += "module autogenerated\n"
 
-        for var in self.variable_bounds:
-            res += "\t{}: [{}..{}];\n".format(var.name, self.get_lower_bound(var), self.get_upper_bound(var))
+        for var in self.int_variables_bounds:
+            res += "\t{}: [{}..{}] init {};\n"\
+                .format(var.name, self.get_lower_bound(var), self.get_upper_bound(var), self.initial_values[var])
 
         for var in self.boolean_variables:
-            res += "\t{}: bool;\n".format(var.name)
+            res += "\t{}: bool init {};\n".format(var.name, self.initial_values[var])
 
         for cmd in self._commands:
             res += "\t{}\n".format(cmd.to_prism_string())

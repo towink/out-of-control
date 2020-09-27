@@ -6,6 +6,8 @@ import stormpy as sp
 
 from locelim.datastructures.PCFP import PCFP
 
+from locelim.interactive import *
+
 # a small hack to print variables/expressions right
 sp.storage.Variable.__repr__ = lambda self: self.name
 sp.Expression.__repr__ = lambda self: str(self)
@@ -116,4 +118,23 @@ def nand_manual_simplification():
     # print(result.at(initial_state))
 
 if __name__ == "__main__":
-    nand_manual_simplification()
+    #nand_manual_simplification()
+
+    # comment out to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+
+    load_model("originals/nand.prism")
+    show_model_constants()
+    set_property("P=? [ F s=4 & z/N<0.1 ]")
+    def_model_constants({'N': 10, 'K': 10})
+    show_orig_model_info()
+    check_orig_model()
+
+    unfold("s")
+    eliminate_all()
+    show_stats()
+    show_as_prism()
+
+    model = session().build_model()
+    session().check_model()
+    print(model)

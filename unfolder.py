@@ -142,9 +142,9 @@ def is_variable_combination_initial(elimination_info, value_combination):
 def eliminate_variables(elimination_names: [str], expression_manager: stormpy.ExpressionManager, model: PCFP, new_model: PCFP):
     elimination_info: [VariableInfo] = []
     var: stormpy.JaniBoundedIntegerVariable
-    for var in model.variable_bounds:
+    for var in model.int_variables_bounds:
 
-        lower_bound, upper_bound = model.variable_bounds[var]
+        lower_bound, upper_bound = model.int_variables_bounds[var]
         lower_bound: stormpy.Expression
         upper_bound: stormpy.Expression
 
@@ -163,7 +163,7 @@ def eliminate_variables(elimination_names: [str], expression_manager: stormpy.Ex
             elimination_info.append(VariableInfo(var, init_expression, values))
 
         else:
-            new_model.variable_bounds[var] = (lower_bound, upper_bound)
+            new_model.int_variables_bounds[var] = (lower_bound, upper_bound)
             new_model.initial_values[var] = init_expression
 
     return elimination_info

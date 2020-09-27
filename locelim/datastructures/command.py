@@ -29,7 +29,7 @@ class Command:
             return " & ".join(["({}'={})".format(var.name, str(self.target_loc[var])) for var in self.target_loc])
 
         def to_prism_string(self) -> str:
-            if len(self.update._parallel_asgs) > 0:
+            if len(self.update._parallel_asgs) > 1 and self.target_loc != {}:
                 delimiter = "&"
             else:
                 delimiter = ""
@@ -57,6 +57,9 @@ class Command:
 
     def has_destination(self, dest: Destination) -> bool:
         return dest in self._destinations
+
+    def count_destinations(self):
+        return len(self._destinations)
 
     # a command has a selfloop if at least one target location equals the source location
     def has_selfloop(self) -> bool:

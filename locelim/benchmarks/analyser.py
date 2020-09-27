@@ -48,7 +48,7 @@ def analyse_potential_unfolds(orig_pcfp):
     for var in vars:
         pcfp = orig_pcfp.copy()
 
-        min_bound, max_bound = orig_pcfp.variable_bounds[var]
+        min_bound, max_bound = orig_pcfp.int_variables_bounds[var]
         min_bound: sp.Expression
         max_bound: sp.Expression
 
@@ -148,7 +148,7 @@ def is_loop_reachable(incomings: List[Tuple[sp.Expression, Update]], loop_guard:
         for var in guard.get_variables():
             if var in pcfp._undef_constants:
                 continue
-            if not var in pcfp.variable_bounds:
+            if not var in pcfp.int_variables_bounds:
                 continue
             var: sp.Variable
             lower_bound = sp.Expression.Geq(var.get_expression(), pcfp.get_lower_bound(var))
