@@ -5,13 +5,14 @@ from typing import Dict
 import stormpy as sp
 
 from locelim.datastructures.PCFP import PCFP
+from locelim.datastructures.util import primitive_type_to_exp
 
 
 class Session:
     """Encapsulates an interactive elimination session
 
     Allows loading a model, setting a property, defining constants, building and checking both the simplified and the
-    original model easily. May be used in a terminal or notebook.
+    original model easily. May be used in a terminal or notebook but also in tests etc to reduce boilerplate code.
     """
 
     # private fields
@@ -100,6 +101,11 @@ class Session:
         """Defines the specified constant, needed for model building/checking"""
         self._constant_defs[name] = value
 
+    def def_model_constants(self, subst_map):
+        """Defines several constants at the same time"""
+        for var in subst_map:
+            self.def_model_constant(var, subst_map[var])
+
     def set_property(self, property: str):
         """Sets the reachabilty property given as a string"""
         self._property = property
@@ -153,9 +159,9 @@ class Session:
         result = sp.model_checking(model, property)
         t_end = time.time()
         logging.info("finished model checking, took {}s".format(t_end - t_start))
-        result = result.at(model.initial_states[0])
-        print("result: {}".format(result))
-        return result
+        num_result = result.at(model.initial_states[0])
+        print("result: {}".format(num_result))
+        return num_result
 
     def check_model(self):
         """Checks the model obtained from the current PCFP.
@@ -170,9 +176,9 @@ class Session:
         result = sp.model_checking(model, property)
         t_end = time.time()
         logging.info("finished model checking, took {}s".format(t_end - t_start))
-        result = result.at(model.initial_states[0])
-        print("result: {}".format(result.at(model.initial_states[0])))
-        return result
+        num_result = result.at(model.initial_states[0])
+        print("result: {}".format(num_result))
+        return num_result
 
     def show_orig_model_info(self):
         """Prints storm's statistics string for the original model, requires building"""
@@ -181,6 +187,15 @@ class Session:
     def unfold(self, var: str):
         """Unfolds the specified variable."""
         self._pcfp.unfold(self._exp_mgr.get_variable(var))
+
+    def eliminate(self, loc: Dict[str, object]):
+        """Eliminate specified location (variables encoded as strings)."""
+        loc_converted = {}
+        for var, value in loc.items():
+            var_sp = self._exp_mgr.get_variable(var)
+            val_exp = primitive_type_to_exp(value, self._exp_mgr)
+            loc_converted[var_sp] = val_exp
+        self._pcfp.eliminate_loc(loc_converted, silent=True)
 
     def eliminate_all(self):
         if self._property is None:
@@ -261,8 +276,7 @@ def def_model_constant(name: str, value: object):
 
 
 def def_model_constants(subst_map):
-    for var in subst_map:
-        def_model_constant(var, subst_map[var])
+    _session.def_model_constants(subst_map)
 
 
 def check_orig_model():
@@ -278,7 +292,7 @@ def eliminate_all():
 
 
 def eliminate(loc):
-    raise NotImplementedError
+    _session.eliminate(loc)
 
 
 def show_eliminable_locations():
