@@ -9,8 +9,8 @@ from locelim.datastructures.PCFP import PCFP
 from locelim.interactive import *
 
 # a small hack to print variables/expressions right
-sp.storage.Variable.__repr__ = lambda self: self.name
-sp.Expression.__repr__ = lambda self: str(self)
+# sp.storage.Variable.__repr__ = lambda self: self.name
+# sp.Expression.__repr__ = lambda self: str(self)
 
 
 def transitions_count(model):
@@ -127,11 +127,14 @@ if __name__ == "__main__":
     show_model_constants()
     set_property("P=? [ F s=4 & z/N<0.1 ]")
     def_model_constants({'N': 10, 'K': 10})
-    show_orig_model_info()
-    check_orig_model()
+
+    res_orig = check_orig_model()
 
     unfold("s")
-    eliminate_all()
+    eliminate({"s": 2})
+    eliminate({"s": 3})
+    eliminate({"s": 1})
+    #eliminate_all()
     show_stats()
     show_as_prism()
 

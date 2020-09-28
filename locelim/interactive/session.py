@@ -212,12 +212,20 @@ class Session:
             to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
 
     def show_eliminable_locations(self):
+        """Prints the currently directly eliminable locations.
+
+        A location counts as eliminable if the following three conditions holds:
+        - the location has no self-loop
+        - it is guaranteed to be neither initial nor final
+        Note that eliminating one of these locations can make the others non-eliminable!
+        """
         if self._property is None:
             goal_predicate = self._exp_mgr.create_boolean(True)
         else:
             goal_predicate = self._get_goal_predicate()
-        print("currently eliminable locations:")
-        [print(loc) for loc in self._pcfp.get_eliminable_locs(goal_predicate)]
+        eliminable_locs = self._pcfp.get_eliminable_locs(goal_predicate)
+        print("currently eliminable locations: {}".format(len(eliminable_locs)))
+        [print(loc) for loc in eliminable_locs]
 
     def show_stats(self):
         """Print some statistics about the current PCFP"""

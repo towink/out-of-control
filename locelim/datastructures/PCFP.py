@@ -209,11 +209,14 @@ class PCFP:
     # the locations that have no self loops, are not possibly initial or final
     def get_eliminable_locs(self, target_predicate: sp.Expression) -> []:
         result = []
-        solver = Z3SmtSolver(target_predicate.manager)
+        # I have tried to not create a new solver in each iteration but had difficulties with that
         for loc in self.get_locs_without_selfloops():
-            solver.add(target_predicate.substitute(loc))
+            goal_pred_loc_substituted = target_predicate.substitute(loc).simplify()
+            solver = Z3SmtSolver(self.original_jani.expression_manager)
+            solver.add(goal_pred_loc_substituted)
             solver.push()
-            if not self.is_loc_possibly_initial(loc) and solver.check() == SmtCheckResult.Unsat:
+            check_res = solver.check()
+            if not self.is_loc_possibly_initial(loc) and check_res == SmtCheckResult.Unsat:
                 result.append(loc)
         return result
 

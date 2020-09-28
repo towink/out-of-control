@@ -1,4 +1,5 @@
 # manual analysis of bluetooth benchmark
+import logging
 import time
 from typing import Dict, List, Tuple
 
@@ -9,6 +10,8 @@ import unfolder
 from locelim.datastructures.PCFP import PCFP
 from locelim.datastructures.command import Command
 from locelim.benchmarks.analyser import analyse_locations, analyse_potential_unfolds
+
+from locelim.interactive import *
 
 # a small hack to print variables/expressions right
 sp.storage.Variable.__repr__ = lambda self: self.name
@@ -92,4 +95,42 @@ def eliminate_locations(max_tries, pcfp, new_transition_cutoff):
 
 
 if __name__ == "__main__":
-    bluetooth_manual_simplification()
+    #bluetooth_manual_simplification()
+
+    # comment out to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+
+    load_model("originals/brp.prism")
+    def_model_constants({"N": 1000, "MAX": 20})
+    set_property("P=? [ F s=5 & srep=2 ]")
+
+    show_stats()
+    show_orig_model_info()
+    check_orig_model()
+
+    unfold("r")
+    unfold("s")
+    # eliminate({"r":1, "s":0 })
+    # eliminate({"r":2, "s":0 })
+    # eliminate({"r":3, "s":0 })
+    # eliminate({"r":4, "s":0 })
+    show_eliminable_locations()
+    eliminate_all()
+    unfold("l")
+    unfold("k")
+    show_eliminable_locations()
+    eliminate_all()
+    unfold("srep")
+    show_eliminable_locations()
+    eliminate_all()
+    unfold("s_ab")
+    show_eliminable_locations()
+    eliminate_all()
+    show_as_prism()
+
+
+    show_stats()
+    model = session().build_model()
+    print(model)
+    session().check_model()
+

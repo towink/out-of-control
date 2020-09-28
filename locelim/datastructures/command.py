@@ -22,14 +22,13 @@ class Command:
             result_probability = self.probability.substitute(subst_map).simplify()
             result_update = self.update.substitute(subst_map)
             result_target_loc = {**self.target_loc, **self.update.evaluate(subst_map)}  # merge dicts into new dict
-            result = Command.Destination(result_probability, result_update, result_target_loc)
-            return result
+            return Command.Destination(result_probability, result_update, result_target_loc)
 
         def target_loc_to_prism_string(self) -> str:
             return " & ".join(["({}'={})".format(var.name, str(self.target_loc[var])) for var in self.target_loc])
 
         def to_prism_string(self) -> str:
-            if len(self.update._parallel_asgs) > 1 and self.target_loc != {}:
+            if len(self.update._parallel_asgs) > 0 and self.target_loc != {}:
                 delimiter = "&"
             else:
                 delimiter = ""
