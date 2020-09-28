@@ -6,12 +6,16 @@ import stormpy as sp
 
 from locelim.datastructures.PCFP import PCFP
 
-# a small hack to print variables/expressions right
-sp.storage.Variable.__repr__ = lambda self: self.name
-sp.Expression.__repr__ = lambda self: str(self)
-
 
 class Session:
+    """Encapsulates an interactive elimination session
+
+    Allows loading a model, setting a property, defining constants, building and checking both the simplified and the
+    original model easily. May be used in a terminal or notebook.
+    """
+
+    # private fields
+
     # the original prism program
     _orig_prism_model: sp.PrismProgram = None
     # the original jani model converted from prism (possibly flattened)
@@ -24,11 +28,7 @@ class Session:
     _constant_defs = {}
     _exp_mgr: sp.ExpressionManager = None
 
-    def show_model_constants(self):
-        print([c.name for c in self._orig_prism_model.constants if not c.defined])
-
-    def def_model_constant(self, name: str, value: object):
-        self._constant_defs[name] = value
+    # private functions
 
     def _get_constants_for_prism_model(self, prism_model) -> Dict[sp.Variable, sp.Expression]:
         # makes a constant substitution dict for the given prism from the raw user provided defs
@@ -41,23 +41,31 @@ class Session:
                 raise NotImplementedError
         return result
 
-    def build_orig_model(self):
-        constant_defs = self._get_constants_for_prism_model(self._orig_prism_model)
-        orig_prism_constants_defined = self._orig_prism_model.define_constants(constant_defs)
-        if self._property is not None:
-            prop = self._get_property_for_prism_model(orig_prism_constants_defined, define_constants=False)
-            logging.info("start building original model ...")
-            t_start = time.time()
-            model = sp.build_model(orig_prism_constants_defined, [prop])
+    def _get_property_for_prism_model(self, model, define_constants=True):
+        # converts the raw user-provided property string to a storm property adapted to specified model
+        if self._property is None:
+            raise Exception("no property defined")
+        if define_constants:
+            # define the constants as they may appear in the property
+            constant_defs = self._get_constants_for_prism_model(model)
+            property_context_model = model.define_constants(constant_defs)
         else:
-            logging.info("start building original model ...")
-            t_start = time.time()
-            model = sp.build_model(orig_prism_constants_defined)
-        t_end = time.time()
-        logging.info("finished model building, took {}s".format(t_end - t_start))
-        return model
+            property_context_model = model
+        properties = sp.parse_properties_for_prism_program(self._property, property_context_model)
+        return properties[0]
+
+    def _get_goal_predicate(self) -> sp.Expression:
+        # retrieves the goal predicate as an sp.Expression from the given reach property
+        if self._property is None:
+            raise Exception("cannot infer goal predicate: no property set")
+        property = self._get_property_for_prism_model(self._orig_prism_model, define_constants=False)
+        # assume property of format "P F exp"
+        goal_predicate = property.raw_formula.subformula.subformula.get_expression()
+        return goal_predicate
 
     def _get_simplified_prism_model(self):
+        # obtain prism model from the current state of the PCFP
+        # stormpy cannot directly parse a prism string, so we write and read from a file
         with open("tmp.prism", "w") as f:
             f.write(self._pcfp.to_prism_string())
         simplified_prism = sp.parse_prism_program("tmp.prism")
@@ -65,31 +73,10 @@ class Session:
         simplified_prism_constants_defined = simplified_prism.define_constants(constant_defs)
         return simplified_prism_constants_defined
 
-    # build the model from the current pcfp,
-    def build_model(self, return_simplified_prism=False):
-        simplified_prism_constants_defined = self._get_simplified_prism_model()
-        if self._property is not None:
-            # constants are already defined
-            prop = self._get_property_for_prism_model(simplified_prism_constants_defined, define_constants=False)
-            logging.info("start building simplified model ...")
-            t_start = time.time()
-            model = sp.build_model(simplified_prism_constants_defined, [prop])
-        else:
-            logging.info("start building simplified model ...")
-            t_start = time.time()
-            model = sp.build_model(simplified_prism_constants_defined)
-        t_end = time.time()
-        logging.info("finished model building, took {}s".format(t_end - t_start))
-        if return_simplified_prism:
-            return model, simplified_prism_constants_defined
-        else:
-            return model
-
-    def show_orig_model_info(self):
-        # this automatically prints the statistics string from storm
-        print(self.build_orig_model())
+    # public functions
 
     def load_model(self, path_to_prism: str):
+        """Loads the prism model from the specified path"""
         if self._orig_prism_model is not None:
             raise Exception("another model is already loaded")
         logging.info("parsing prism model {} ...".format(path_to_prism))
@@ -105,36 +92,60 @@ class Session:
         self._orig_jani_model = jani_model
         self._pcfp = pcfp
 
-    def unfold(self, var: str):
-        self._pcfp.unfold(self._exp_mgr.get_variable(var))
+    def show_model_constants(self):
+        """Prints all undefined constants"""
+        print([c.name for c in self._orig_prism_model.constants if not c.defined])
+
+    def def_model_constant(self, name: str, value: object):
+        """Defines the specified constant, needed for model building/checking"""
+        self._constant_defs[name] = value
 
     def set_property(self, property: str):
+        """Sets the reachabilty property given as a string"""
         self._property = property
 
-    def _get_property_for_prism_model(self, model, define_constants=True):
-        if define_constants:
-            # define the constants as they may appear in the property
-            constant_defs = self._get_constants_for_prism_model(model)
-            property_context_model = model.define_constants(constant_defs)
+    def build_orig_model(self):
+        """Builds the original model"""
+        constant_defs = self._get_constants_for_prism_model(self._orig_prism_model)
+        orig_prism_constants_defined = self._orig_prism_model.define_constants(constant_defs)
+        if self._property is not None:
+            prop = self._get_property_for_prism_model(orig_prism_constants_defined, define_constants=False)
+            logging.info("start building original model ...")
+            t_start = time.time()
+            model = sp.build_model(orig_prism_constants_defined, [prop])
         else:
-            property_context_model = model
-        properties = sp.parse_properties_for_prism_program(self._property, property_context_model)
-        return properties[0]
+            logging.info("start building original model ...")
+            t_start = time.time()
+            model = sp.build_model(orig_prism_constants_defined)
+        t_end = time.time()
+        logging.info("finished model building, took {}s".format(t_end - t_start))
+        return model
 
-    def _get_property_for_orig_prism(self, define_constants=True):
-        return self._get_property_for_prism_model(self._orig_prism_model, define_constants)
-
-    # retrieves the goal predicate as an sp.Expression from the given reach property
-    def _get_goal_predicate(self) -> sp.Expression:
-        if self._property is None:
-            raise Exception("cannot infer goal predicate: no property set")
-        property = self._get_property_for_prism_model(self._orig_prism_model, define_constants=False)
-        goal_predicate = property.raw_formula.subformula.subformula.get_expression()
-        return goal_predicate
+    def build_model(self, return_simplified_prism=False):
+        """Builds the model for the current PCFP"""
+        simplified_prism_constants_defined = self._get_simplified_prism_model()
+        if self._property is not None:
+            # note that constants are already defined
+            prop = self._get_property_for_prism_model(simplified_prism_constants_defined, define_constants=False)
+            logging.info("start building simplified model ...")
+            t_start = time.time()
+            model = sp.build_model(simplified_prism_constants_defined, [prop])
+        else:
+            logging.info("start building simplified model ...")
+            t_start = time.time()
+            model = sp.build_model(simplified_prism_constants_defined)
+        t_end = time.time()
+        logging.info("finished model building, took {}s".format(t_end - t_start))
+        if return_simplified_prism:
+            return model, simplified_prism_constants_defined
+        else:
+            return model
 
     def check_orig_model(self):
-        if self._property is None:
-            raise Exception("cannot check model: no property defined")
+        """Checks the original model
+
+        Requires that a property is set and constants are defined. Prints and returns result.
+        """
         model = self.build_orig_model()
         property = self._get_property_for_prism_model(self._orig_prism_model)
         logging.info("start model checking ...")
@@ -142,11 +153,15 @@ class Session:
         result = sp.model_checking(model, property)
         t_end = time.time()
         logging.info("finished model checking, took {}s".format(t_end - t_start))
-        print(result.at(model.initial_states[0]))
+        result = result.at(model.initial_states[0])
+        print("result: {}".format(result))
+        return result
 
     def check_model(self):
-        if self._property is None:
-            raise Exception("cannot check model: no property defined")
+        """Checks the model obtained from the current PCFP.
+
+        Requires that a property is set and constants are defined. Prints and returns result.
+        """
         model, simplified_prism = self.build_model(return_simplified_prism=True)
         # constants have already been defined for simplified_prism
         property = self._get_property_for_prism_model(simplified_prism, define_constants=False)
@@ -155,7 +170,17 @@ class Session:
         result = sp.model_checking(model, property)
         t_end = time.time()
         logging.info("finished model checking, took {}s".format(t_end - t_start))
+        result = result.at(model.initial_states[0])
         print("result: {}".format(result.at(model.initial_states[0])))
+        return result
+
+    def show_orig_model_info(self):
+        """Prints storm's statistics string for the original model, requires building"""
+        print(self.build_orig_model())
+
+    def unfold(self, var: str):
+        """Unfolds the specified variable."""
+        self._pcfp.unfold(self._exp_mgr.get_variable(var))
 
     def eliminate_all(self):
         if self._property is None:
@@ -180,6 +205,7 @@ class Session:
         [print(loc) for loc in self._pcfp.get_eliminable_locs(goal_predicate)]
 
     def show_stats(self):
+        """Print some statistics about the current PCFP"""
         print("number of locatios: {}".format(len(self._pcfp.get_locs())))
         print("number of commands: {}".format(len(self._pcfp.commands)))
         destinations_count = self._pcfp.count_destinations()
@@ -187,26 +213,31 @@ class Session:
                                                                    destinations_count / len(self._pcfp.commands)))
 
     def show_as_prism(self):
+        """Prints the current PCFP as prism"""
         print(self._pcfp.to_prism_string())
 
     def save_as_prism(self, path):
+        """Saves the current PCFP as a prism file"""
         with open(path, "w") as f:
             f.write(self._pcfp.to_prism_string())
 
 
-# print("Welcome to the interactive location elimination. You may type \"show_help()\".")
+# Commands intended for interactive use.
+# TODO: this is far form being complete
 
-# the current session
+# create a session when this file is included
 _session = Session()
 
 
-# for doing hacks
+def reset_session():
+    """Resets the current session"""
+    global _session
+    _session = Session()
+
+
 def session():
+    """Returns the current session object"""
     return _session
-
-
-def show_help():
-    return "This should list the available commands :)"
 
 
 def show_model_constants():
@@ -219,11 +250,6 @@ def show_orig_model_info():
 
 def set_property(property: str):
     _session.set_property(property)
-
-
-def reset_session():
-    # does not work like this
-    _session = Session()
 
 
 def load_model(path_to_prism: str):
@@ -243,68 +269,45 @@ def check_orig_model():
     _session.check_orig_model()
 
 
-def show_variables():
-    _session.show_variables()
-
-
-# number of commands, number of locations, ...
 def show_stats():
     _session.show_stats()
 
 
-# eliminate as much as possible
 def eliminate_all():
     _session.eliminate_all()
 
 
-# locations that can be immediately eliminated:
-# no self loops, definitely not initial or target
+def eliminate(loc):
+    raise NotImplementedError
+
+
 def show_eliminable_locations():
     _session.show_eliminable_locations()
 
 
-# all variables that currently exist
 def show_all_variables():
-    pass
+    raise NotImplementedError
 
 
-# show all (undefined?) constants
-def show_constants():
-    pass
-
-
-def show_commands():
-    pass
-
-
-# variables that can be immediately unfolded, also show their domains
 def show_unfoldable_variables():
-    pass
+    raise NotImplementedError
 
 
 def unfold(var: str):
     _session.unfold(var)
 
 
-# eliminates all easy self loops
 def eliminate_easy_self_loops():
-    # show how many were eliminated
-    pass
+    raise NotImplementedError
 
 
-# applies transition elimination once to each self loop, they may disappear by doing so
 def try_eliminate_self_loops(loc=None):
-    # show how many where eliminated
-    pass
-
-
-def eliminate(loc):
-    # fails if loc is not eliminable
-    pass
+    # applies transition elimination once to each self loop, they may disappear by doing so
+    raise NotImplementedError
 
 
 def save_as_prism(path: str):
-    pass
+    _session.save_as_prism(path)
 
 
 def show_as_prism():
