@@ -12,16 +12,27 @@ if __name__ == "__main__":
     show_orig_model_info()
 
 
+
     check_orig_model()
 
     show_stats()
+    #unfold("launch")
+    #unfold("new")
+    # unfold("start")
+    # unfold("run")
     unfold("lastSeen")
-    #unfold("recordLast")
+
+    #session()._pcfp.get_lucky_locs()
     unfold("good")
     unfold("bad")
-    unfold("start")
+    unfold("recordLast")
+    unfold("badObserve")
+    #unfold("deliver")
+    #unfold("done")
+    session().show_loc_info()
 
     show_stats()
+    session()._pcfp.eliminate_nop_selfloops()
     show_eliminable_locations()
 
     print(session().build_model())

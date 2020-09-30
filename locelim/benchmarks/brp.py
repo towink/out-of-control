@@ -101,7 +101,7 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
     load_model("originals/brp.prism")
-    def_model_constants({"N": 1000, "MAX": 20})
+    def_model_constants({"N": 10000, "MAX": 10})
     set_property("P=? [ F s=5 & srep=2 ]")
 
     show_stats()
@@ -110,27 +110,25 @@ if __name__ == "__main__":
 
     unfold("r")
     unfold("s")
-    # eliminate({"r":1, "s":0 })
-    # eliminate({"r":2, "s":0 })
-    # eliminate({"r":3, "s":0 })
-    # eliminate({"r":4, "s":0 })
     show_eliminable_locations()
     eliminate_all()
+
     unfold("l")
     unfold("k")
     show_eliminable_locations()
     eliminate_all()
+
     unfold("srep")
     show_eliminable_locations()
     eliminate_all()
+
     unfold("s_ab")
     show_eliminable_locations()
     eliminate_all()
-    show_as_prism()
 
+    #show_as_prism()
 
     show_stats()
     model = session().build_model()
     print(model)
     session().check_model()
-

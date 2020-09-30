@@ -8,7 +8,7 @@ if __name__ == "__main__":
 
     load_model("originals/consensus.2.prism")
     show_model_constants()
-    def_model_constant('K', 10)
+    def_model_constant('K', 100)
     show_orig_model_info()
 
     # set_property('Pmin=? [ F "finished"&"all_coins_equal_1" ]')
@@ -17,11 +17,39 @@ if __name__ == "__main__":
     check_orig_model()
 
     show_stats()
-    unfold('coin1')
-    #unfold('pc2')
+    unfold('pc1')
+    unfold('pc2')
+
+    show_stats()
 
     show_eliminable_locations()
     #eliminate_all()
+    eliminate({"pc1": 3, "pc2": 0})
+
+    show_eliminable_locations()
+    eliminate({"pc1": 0, "pc2": 3})
+    show_eliminable_locations()
+
+    eliminate({"pc1": 1, "pc2": 0})
+    eliminate({"pc1": 0, "pc2": 1})
+    show_eliminable_locations()
+
+    eliminate({"pc1": 3, "pc2": 2})
+    eliminate({"pc1": 2, "pc2": 3})
+    show_eliminable_locations()
+
+    eliminate({"pc1": 0, "pc2": 2})
+    eliminate({"pc1": 2, "pc2": 0})
+    show_eliminable_locations()
+
+    eliminate({"pc1": 2, "pc2": 2})
+    show_eliminable_locations()
+
+    session().show_loc_info()
+
+    show_stats()
+    session()._pcfp.remove_duplicate_cmds()
+
 
     show_stats()
 

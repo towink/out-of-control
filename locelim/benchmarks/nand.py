@@ -134,7 +134,7 @@ if __name__ == "__main__":
     eliminate({"s": 2})
     eliminate({"s": 3})
     eliminate({"s": 1})
-    #eliminate_all()
+    show_eliminable_locations()
     show_stats()
     show_as_prism()
 

@@ -5,7 +5,7 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
     load_model("originals/firewire.false.prism")
-    set_property('P>=1 [ F (s1=8 & s2=7) | (s1=7 & s2=8) ]') # P>=1 [ F "done" ]
+    set_property('Pmin=? [ F (s1=8 & s2=7) | (s1=7 & s2=8) ]') # P>=1 [ F "done" ]
 
     show_model_constants()
     def_model_constants({'delay': 3, 'deadline': 200})
@@ -16,13 +16,15 @@ if __name__ == "__main__":
 
     show_stats()
 
-    #unfold("w12")
+    unfold("x1")
     #unfold("w21")
-    unfold("s1")
-    unfold("s2")
+    #unfold("s1")
+    #unfold("s2")
+
 
     show_stats()
     show_eliminable_locations()
+    session().show_loc_info()
 
     print(session().build_model())
     session().check_model()
