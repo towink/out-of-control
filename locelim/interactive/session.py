@@ -5,7 +5,7 @@ from typing import Dict
 import stormpy as sp
 
 from locelim.datastructures.PCFP import PCFP
-from locelim.datastructures.util import primitive_type_to_exp
+from locelim.datastructures.util import primitive_type_to_exp, are_locs_equal
 
 
 class Session:
@@ -28,6 +28,14 @@ class Session:
     # the current definitions of the model constants
     _constant_defs = {}
     _exp_mgr: sp.ExpressionManager = None
+
+    def __init__(self):
+        self._orig_prism_model = None
+        self._orig_jani_model = None
+        self._pcfp = None
+        self._property = None
+        self._constant_defs = {}
+        self._exp_mgr = None
 
     # private functions
 
@@ -211,6 +219,21 @@ class Session:
             logging.info("elimination took {}s".format(t_end - t_start))
             to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
 
+    def show_loc_info(self):
+        for loc in self._pcfp.get_locs():
+            commands = self._pcfp.get_commands_with_source(loc)
+            commands_with_selfloops = [cmd for cmd in commands if cmd.has_selfloop()]
+            dest_count = sum([len(cmd.destinations) for cmd in commands])
+            ingoing = self._pcfp.get_destinations_with_target(loc)
+            selfloops = []
+            for cmd in commands:
+                for dest in cmd.destinations:
+                    if are_locs_equal(dest.target_loc, loc):
+                        selfloops.append(dest)
+            print("{}: {} cmd(s), {} dests, {} selfloops (in {} cmds), {} ingoing trans".format(
+                loc, len(commands), dest_count, len(selfloops), len(commands_with_selfloops), len(ingoing)))
+
+
     def show_eliminable_locations(self):
         """Prints the currently directly eliminable locations.
 
@@ -225,7 +248,7 @@ class Session:
             goal_predicate = self._get_goal_predicate()
         eliminable_locs = self._pcfp.get_eliminable_locs(goal_predicate)
         print("currently eliminable locations: {}".format(len(eliminable_locs)))
-        [print(loc) for loc in eliminable_locs]
+        [print("{}, {}".format(loc, self._pcfp.estimate_elim_complexity_for_loc(loc))) for loc in eliminable_locs]
 
     def show_stats(self):
         """Print some statistics about the current PCFP"""
@@ -260,7 +283,8 @@ def reset_session():
 
 def session():
     """Returns the current session object"""
-    return _session
+    res = _session
+    return res
 
 
 def show_model_constants():

@@ -67,6 +67,9 @@ class Command:
     def has_nop_selfloop(self) -> bool:
         return any([dest.update.is_nop() for dest in self._destinations])
 
+    def get_nop_selfloops(self) -> [Destination]:
+        return [dest.update.is_nop() for dest in self._destinations]
+
     def substitute(self, subst_map: Dict[sp.Variable, sp.Expression]):
         result_guard = self._guard.substitute(subst_map).simplify()
         result_destinations = [dest.substitute(subst_map) for dest in self._destinations]
