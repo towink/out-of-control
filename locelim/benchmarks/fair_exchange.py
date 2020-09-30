@@ -1,4 +1,6 @@
 from locelim.interactive import *
+from locelim.interactive.commands import session, show_model_constants, show_orig_model_info, set_property, load_model, \
+    check_orig_model, show_pcfp_stats, eliminate_all, show_eliminable_locations, unfold, show_as_prism
 
 if __name__ == "__main__":
 
@@ -18,12 +20,12 @@ if __name__ == "__main__":
     unfold("turn")
     #unfold("i")  # there is a bug when unfolding i
     show_eliminable_locations()
-    session().show_loc_info()
+    session().get_loc_info()
     eliminate_all()
     show_as_prism()
 
 
-    show_stats()
+    show_pcfp_stats()
     #show_as_prism()
 
     model = session().build_model()

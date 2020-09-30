@@ -1,4 +1,6 @@
 from locelim.interactive import *
+from locelim.interactive.commands import session, show_model_constants, show_orig_model_info, set_property, load_model, \
+    def_model_constants, check_orig_model, show_pcfp_stats, show_eliminable_locations, unfold
 
 if __name__ == "__main__":
     # comment out to disable logging
@@ -14,7 +16,7 @@ if __name__ == "__main__":
 
     check_orig_model()
 
-    show_stats()
+    show_pcfp_stats()
 
     unfold("x1")
     #unfold("w21")
@@ -22,9 +24,9 @@ if __name__ == "__main__":
     #unfold("s2")
 
 
-    show_stats()
+    show_pcfp_stats()
     show_eliminable_locations()
-    session().show_loc_info()
+    session().get_loc_info()
 
     print(session().build_model())
     session().check_model()

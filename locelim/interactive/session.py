@@ -101,9 +101,9 @@ class Session:
         self._orig_jani_model = jani_model
         self._pcfp = pcfp
 
-    def show_model_constants(self):
-        """Prints all undefined constants"""
-        print([c.name for c in self._orig_prism_model.constants if not c.defined])
+    def get_model_constants(self):
+        """Returns all undefined constants"""
+        return [c.name for c in self._orig_prism_model.constants if not c.defined]
 
     def def_model_constant(self, name: str, value: object):
         """Defines the specified constant, needed for model building/checking"""
@@ -118,7 +118,7 @@ class Session:
         """Sets the reachabilty property given as a string"""
         self._property = property
 
-    def build_orig_model(self):
+    def build_orig_model(self, return_time=False):
         """Builds the original model"""
         constant_defs = self._get_constants_for_prism_model(self._orig_prism_model)
         orig_prism_constants_defined = self._orig_prism_model.define_constants(constant_defs)
@@ -133,9 +133,12 @@ class Session:
             model = sp.build_model(orig_prism_constants_defined)
         t_end = time.time()
         logging.info("finished model building, took {}s".format(t_end - t_start))
-        return model
+        if return_time:
+            return model, t_end - t_start
+        else:
+            return model
 
-    def build_model(self, return_simplified_prism=False):
+    def build_model(self, return_time=False, return_simplified_prism=False):
         """Builds the model for the current PCFP"""
         simplified_prism_constants_defined = self._get_simplified_prism_model()
         if self._property is not None:
@@ -151,13 +154,20 @@ class Session:
         t_end = time.time()
         logging.info("finished model building, took {}s".format(t_end - t_start))
         if return_simplified_prism:
-            return model, simplified_prism_constants_defined
+            if return_time:
+                return model, t_end - t_start, simplified_prism_constants_defined
+            else:
+                return model, simplified_prism_constants_defined
         else:
-            return model
+            if return_time:
+                return model, t_end - t_start
+            else:
+                return model
 
-    def check_orig_model(self):
+    def check_orig_model(self, return_time=False):
         """Checks the original model
 
+        Returns the result and optionally the model checking time.
         Requires that a property is set and constants are defined. Prints and returns result.
         """
         model = self.build_orig_model()
@@ -168,12 +178,15 @@ class Session:
         t_end = time.time()
         logging.info("finished model checking, took {}s".format(t_end - t_start))
         num_result = result.at(model.initial_states[0])
-        print("result: {}".format(num_result))
-        return num_result
+        if return_time:
+            return num_result, t_end - t_start
+        else:
+            return num_result
 
-    def check_model(self):
+    def check_model(self, return_time=False):
         """Checks the model obtained from the current PCFP.
 
+        Returns the result and optionally the model checking time.
         Requires that a property is set and constants are defined. Prints and returns result.
         """
         model, simplified_prism = self.build_model(return_simplified_prism=True)
@@ -185,12 +198,10 @@ class Session:
         t_end = time.time()
         logging.info("finished model checking, took {}s".format(t_end - t_start))
         num_result = result.at(model.initial_states[0])
-        print("result: {}".format(num_result))
-        return num_result
-
-    def show_orig_model_info(self):
-        """Prints storm's statistics string for the original model, requires building"""
-        print(self.build_orig_model())
+        if return_time:
+            return num_result, t_end - t_start
+        else:
+            return num_result
 
     def unfold(self, var: str):
         """Unfolds the specified variable."""
@@ -203,7 +214,7 @@ class Session:
             var_sp = self._exp_mgr.get_variable(var)
             val_exp = primitive_type_to_exp(value, self._exp_mgr)
             loc_converted[var_sp] = val_exp
-        self._pcfp.eliminate_loc(loc_converted, silent=True)
+        self._pcfp.eliminate_loc(loc_converted)
 
     def eliminate_all(self):
         if self._property is None:
@@ -212,17 +223,15 @@ class Session:
         to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
         while to_eliminate:
             loc = to_eliminate.pop()
-            logging.info("eliminating {}".format(loc))
-            t_start = time.time()
-            self._pcfp.eliminate_loc(loc, silent=True)
-            t_end = time.time()
-            logging.info("elimination took {}s".format(t_end - t_start))
+            self._pcfp.eliminate_loc(loc)
             to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
 
-    def show_loc_info(self):
+    def get_loc_info(self):
+        """Returns detailed information for each location"""
+        result = []
         for loc in self._pcfp.get_locs():
             commands = self._pcfp.get_commands_with_source(loc)
-            commands_with_selfloops = [cmd for cmd in commands if cmd.has_selfloop()]
+            # commands_with_selfloops = [cmd for cmd in commands if cmd.has_selfloop()]
             dest_count = sum([len(cmd.destinations) for cmd in commands])
             ingoing = self._pcfp.get_destinations_with_target(loc)
             selfloops = []
@@ -230,9 +239,14 @@ class Session:
                 for dest in cmd.destinations:
                     if are_locs_equal(dest.target_loc, loc):
                         selfloops.append(dest)
-            print("{}: {} cmd(s), {} dests, {} selfloops (in {} cmds), {} ingoing trans".format(
-                loc, len(commands), dest_count, len(selfloops), len(commands_with_selfloops), len(ingoing)))
-
+            result.append({
+                "label": loc,
+                "commands": len(commands),
+                "trans out": dest_count,
+                "trans in": len(ingoing),
+                "selfloops": len(selfloops)
+            })
+        return result
 
     def show_eliminable_locations(self):
         """Prints the currently directly eliminable locations.
@@ -250,13 +264,13 @@ class Session:
         print("currently eliminable locations: {}".format(len(eliminable_locs)))
         [print("{}, {}".format(loc, self._pcfp.estimate_elim_complexity_for_loc(loc))) for loc in eliminable_locs]
 
-    def show_stats(self):
-        """Print some statistics about the current PCFP"""
-        print("number of locatios: {}".format(len(self._pcfp.get_locs())))
-        print("number of commands: {}".format(len(self._pcfp.commands)))
-        destinations_count = self._pcfp.count_destinations()
-        print("number of destinations: {} (avg {}/command)".format(destinations_count,
-                                                                   destinations_count / len(self._pcfp.commands)))
+    def get_pcfp_stats(self):
+        """Return some statistics about the current PCFP"""
+        return {
+            "locations": len(self._pcfp.get_locs()),
+            "commands": len(self._pcfp.commands),
+            "transitions": self._pcfp.count_destinations()
+        }
 
     def show_as_prism(self):
         """Prints the current PCFP as prism"""
@@ -266,95 +280,3 @@ class Session:
         """Saves the current PCFP as a prism file"""
         with open(path, "w") as f:
             f.write(self._pcfp.to_prism_string())
-
-
-# Commands intended for interactive use.
-# TODO: this is far form being complete
-
-# create a session when this file is included
-_session = Session()
-
-
-def reset_session():
-    """Resets the current session"""
-    global _session
-    _session = Session()
-
-
-def session():
-    """Returns the current session object"""
-    res = _session
-    return res
-
-
-def show_model_constants():
-    _session.show_model_constants()
-
-
-def show_orig_model_info():
-    _session.show_orig_model_info()
-
-
-def set_property(property: str):
-    _session.set_property(property)
-
-
-def load_model(path_to_prism: str):
-    _session.load_model(path_to_prism)
-
-
-def def_model_constant(name: str, value: object):
-    _session.def_model_constant(name, value)
-
-
-def def_model_constants(subst_map):
-    _session.def_model_constants(subst_map)
-
-
-def check_orig_model():
-    _session.check_orig_model()
-
-
-def show_stats():
-    _session.show_stats()
-
-
-def eliminate_all():
-    _session.eliminate_all()
-
-
-def eliminate(loc):
-    _session.eliminate(loc)
-
-
-def show_eliminable_locations():
-    _session.show_eliminable_locations()
-
-
-def show_all_variables():
-    raise NotImplementedError
-
-
-def show_unfoldable_variables():
-    raise NotImplementedError
-
-
-def unfold(var: str):
-    _session.unfold(var)
-
-
-def eliminate_easy_self_loops():
-    raise NotImplementedError
-
-
-def try_eliminate_self_loops(loc=None):
-    # applies transition elimination once to each self loop, they may disappear by doing so
-    raise NotImplementedError
-
-
-def save_as_prism(path: str):
-    _session.save_as_prism(path)
-
-
-def show_as_prism():
-    _session.show_as_prism()

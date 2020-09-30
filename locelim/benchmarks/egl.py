@@ -57,14 +57,15 @@ if __name__ == "__main__":
     set_property('P=? [ F (!{} & {} & phase=4)  ]'.format(kA, kB))
     check_orig_model()
 
-    show_stats()
+    show_pcfp_stats()
     unfold("phase")
     unfold("party")
     unfold("b")
     session()._pcfp.eliminate_nop_selfloops()
     show_eliminable_locations()
-    show_stats()
-    session().show_loc_info()
+    eliminate_all()
+    show_pcfp_stats()
+    session().get_loc_info()
     #show_as_prism()
 
     model = session().build_model()

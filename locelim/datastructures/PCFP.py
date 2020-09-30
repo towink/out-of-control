@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import time
 from typing import Dict, Tuple
 import logging
 
@@ -135,10 +137,10 @@ class PCFP:
                 [cmd.substitute(subst) for cmd in self._commands]
             )
         self._commands = new_commands
-        #self.eliminate_unreachable()
+        self.eliminate_unreachable()
         logging.info("finished unfolding, there are now {} locations".format(len(self.get_locs())))
 
-    def eliminate_transition(self, cmd: Command, dest: Command.Destination, silent=False):
+    def eliminate_transition(self, cmd: Command, dest: Command.Destination):
         # eliminates specified transition, see paper
         next_cmds = self.get_commands_with_source(dest.target_loc)
         # step 1 - build and analyse guards
@@ -181,8 +183,8 @@ class PCFP:
                 solver.add(upper_bound)
             solver.push()
             if solver.check() == SmtCheckResult.Unsat:
-                if not silent:
-                    print("smt solver returned UNSAT")
+                #if not silent:
+                #    print("smt solver returned UNSAT")
                 continue
             destinations = [Command.Destination(p, u, t) for p, u, t in zip(probabilities, updates, targets)]
             self._commands.append(Command(cmd.source_loc, guard, destinations))
@@ -190,16 +192,19 @@ class PCFP:
         self._commands.remove(cmd)
 
     # if loc has no self-loops then it will be unreachable after applying this function
-    def eliminate_loc(self, loc, silent=False):
+    def eliminate_loc(self, loc):
+        logging.info("eliminating {}".format(loc))
+        t_start = time.time()
         to_eliminate = self.get_destinations_with_target(loc)
         while to_eliminate:
             cmd, dest = to_eliminate.pop()  # only need one item of to_eliminate, so could be optimized
-            if not silent:
-                print("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
-            self.eliminate_transition(cmd, dest, silent)
+            logging.debug("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
+            self.eliminate_transition(cmd, dest)
             to_eliminate = self.get_destinations_with_target(loc)
         for cmd in self.get_commands_with_source(loc):
             self._commands.remove(cmd)
+        t_end = time.time()
+        logging.info("elimination took {}s".format(t_end - t_start))
 
     def remove_duplicate_cmds(self):
         # TODO probably does not work like this ...

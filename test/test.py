@@ -3,6 +3,9 @@ from locelim.interactive import *
 
 # this file contains automated tests
 
+from locelim.interactive.commands import reset_session, session
+
+
 def assert_results_close(res_orig, res_other, epsilon=0.0001):
     if abs(res_orig - res_other) > epsilon:
         logging.error("original result: {}, simplified result: {}".format(res_orig, res_other))
@@ -13,58 +16,60 @@ if __name__ == '__main__':
 
     # --- test with nand ---
 
-    session().load_model("{}nand.prism".format(models_folder))
-    session().set_property("P=? [ F s=4 & z/N<0.1 ]")
-    session().def_model_constants({'N': 10, 'K': 10})
+    load_model("{}nand.prism".format(models_folder))
+    set_property("P=? [ F s=4 & z/N<0.1 ]")
+    def_model_constants({'N': 10, 'K': 10})
 
     result_orig = session().check_orig_model()
 
-    session().unfold("s")
+    unfold("s")
 
     # eliminate a few locs and check result after each elimination
-    session().eliminate({"s": 2})
+    eliminate({"s": 2})
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
-    session().eliminate({"s": 3})
+    eliminate({"s": 3})
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
-    session().eliminate({"s": 1})
+    eliminate({"s": 1})
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
     # try other constants
-    session().def_model_constants({'N': 13, 'K': 5})
+    def_model_constants({'N': 13, 'K': 5})
 
     result_orig = session().check_orig_model()
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
+    print("nand test complete")
     reset_session()
 
     # --- test with brp ---
 
-    session().load_model("{}brp.prism".format(models_folder))
-    session().def_model_constants({"N": 32, "MAX": 4})
-    session().set_property("P=? [ F s=5 & srep=2 ]")
+    load_model("{}brp.prism".format(models_folder))
+    def_model_constants({"N": 32, "MAX": 4})
+    set_property("P=? [ F s=5 & srep=2 ]")
 
     result_orig = session().check_orig_model()
 
-    session().unfold("r")
+    unfold("r")
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
-    session().unfold("k")
-    session().unfold("l")
+    unfold("k")
+    unfold("l")
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
-    session().unfold("s")
-    session().eliminate({"r": 4, "k": 0, "l": 0, "s": 3})
+    unfold("s")
+    eliminate({"r": 4, "k": 0, "l": 0, "s": 3})
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
+    print("brp test complete")
     reset_session()
 
     # TODO: write more automated (!) tests here

@@ -1,6 +1,7 @@
 from locelim.interactive import *
 
-from locelim.benchmarks.analyser import analyse_locations
+from locelim.interactive.commands import session, show_model_constants, show_orig_model_info, set_property, load_model, \
+    def_model_constant, check_orig_model, show_pcfp_stats, eliminate, show_eliminable_locations, unfold, show_as_prism
 
 if __name__ == "__main__":
     # comment out to disable logging
@@ -16,11 +17,11 @@ if __name__ == "__main__":
     set_property("Pmin=? [ F pc1=3 & pc2=3 & coin1=1 & coin2=1 ]")
     check_orig_model()
 
-    show_stats()
+    show_pcfp_stats()
     unfold('pc1')
     unfold('pc2')
 
-    show_stats()
+    show_pcfp_stats()
 
     show_eliminable_locations()
     #eliminate_all()
@@ -45,13 +46,13 @@ if __name__ == "__main__":
     eliminate({"pc1": 2, "pc2": 2})
     show_eliminable_locations()
 
-    session().show_loc_info()
+    session().get_loc_info()
 
-    show_stats()
+    show_pcfp_stats()
     session()._pcfp.remove_duplicate_cmds()
 
 
-    show_stats()
+    show_pcfp_stats()
 
     show_as_prism()
     model = session().build_model()

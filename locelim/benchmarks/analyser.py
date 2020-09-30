@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 import stormpy as sp
 from stormpy.utility.utility import Z3SmtSolver, SmtCheckResult
 
+import locelim.interactive.commands
 import unfolder
 from locelim.datastructures.PCFP import PCFP
 from locelim.datastructures.command import Command
@@ -67,7 +68,7 @@ def analyse_potential_unfolds(orig_pcfp):
             continue
 
         start = time.time()
-        pcfp.unfold(var)
+        locelim.interactive.commands.unfold(var)
         end = time.time()
         print("Unfolded " + str(var) + " (range: " + str(range) + ") in " + str(end - start) + "s.")
         analyse_locations(pcfp)

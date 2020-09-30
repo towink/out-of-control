@@ -5,49 +5,34 @@ if __name__ == "__main__":
     # comment out to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-    load_model("originals/leader_sync.5-3.prism")
+    load_model("originals/leader_sync.4-8.prism")
+
     # P>=1 [ F "elected" ]
-    set_property("P=? [ F s1=3&s2=3&s3=3&s4=3&s5=3 ]")
+    #set_property("P=? [ F s1=3&s2=3&s3=3 ]")  # for 3-x
+    set_property("P=? [ F s1=3&s2=3&s3=3&s4=3 ]")  # for 4-x
+    # set_property("P=? [ F s1=3&s2=3&s3=3&s4=3&s5=3 ]")  # for 5-x
+    # set_property("P=? [ F s1=3&s2=3&s3=3&s4=3&s5=3&s6=3 ]")  # for 6-x
+
 
     show_orig_model_info()
-    res_orig = check_orig_model()
+    check_orig_model()
 
-    #show_as_prism()
 
-    show_stats()
+    show_pcfp_stats()
 
     unfold("s1")
-    show_stats()
     show_eliminable_locations()
     eliminate_all()
+    show_pcfp_stats()
 
-    # unfold("s2")
-    # unfold("s3")
-    # unfold("s4")
-    # unfold("s5")
-    #unfold("p5")
     unfold("c")
-    session()._pcfp.eliminate_unreachable()
     show_eliminable_locations()
-    #eliminate_all()
     eliminate({"s1": 1, "c": 2})
-    eliminate({"s1": 1, "c": 4})
     show_eliminable_locations()
-    show_stats()
+    show_loc_info()
 
-    #unfold("p5")
-    # unfold("v1")
-    # unfold("v2")
-    # unfold("v3")
-    # unfold("v4")
-    # unfold("v5")
-    #unfold("u1")
-
-    show_stats()
-    show_eliminable_locations()
-    #eliminate_all()
+    show_pcfp_stats()
 
     model = session().build_model()
     print(model)
-    session().check_model()
-
+    print(session().check_model())

@@ -1,4 +1,6 @@
 from locelim.interactive import *
+from locelim.interactive.commands import session, show_model_constants, show_orig_model_info, set_property, load_model, \
+    def_model_constants, check_orig_model, show_pcfp_stats, show_eliminable_locations, unfold
 
 if __name__ == "__main__":
     # comment out to disable logging
@@ -15,7 +17,7 @@ if __name__ == "__main__":
 
     check_orig_model()
 
-    show_stats()
+    show_pcfp_stats()
     #unfold("launch")
     #unfold("new")
     # unfold("start")
@@ -29,9 +31,9 @@ if __name__ == "__main__":
     unfold("badObserve")
     #unfold("deliver")
     #unfold("done")
-    session().show_loc_info()
+    session().get_loc_info()
 
-    show_stats()
+    show_pcfp_stats()
     session()._pcfp.eliminate_nop_selfloops()
     show_eliminable_locations()
 

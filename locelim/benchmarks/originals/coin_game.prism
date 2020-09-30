@@ -10,10 +10,8 @@ module coingame
 
 	f : bool init false;
 
-	[] 0<x & x<N & f=false -> 0.5 : (x'=x-1) + 0.5 : (f'=true);
-	[] 0<x & x<N & f=true -> 0.5 : (x'=x-1) & (f'=false) + 0.5 : (x'=x+3)  & (f'=false);
-	[] x=0 -> true;
-	[] x>=N -> true;
+	[] 0<x & x<N & !f -> 0.5 : (x'=x-1) + 0.5 : (f'=true);
+	[] 0<x & x<N & f -> 0.5 : (x'=x-1) & (f'=false) + 0.5 : (x'=x+2)  & (f'=false);
+	[] x=0 | x>=N -> true;
 
-	
 endmodule
