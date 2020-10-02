@@ -1,6 +1,4 @@
 from locelim.interactive import *
-from locelim.interactive.commands import session, show_model_constants, set_property, load_model, def_model_constants, \
-    check_orig_model, show_pcfp_stats, show_eliminable_locations, unfold, show_as_prism
 
 if __name__ == "__main__":
 
@@ -10,13 +8,15 @@ if __name__ == "__main__":
     load_model("originals/coin_game.prism")
     show_model_constants()
     set_property("P=? [ F x>=N ]")
-    def_model_constants({'N': 100})
+    def_model_constants({'N': 1000})
 
     res_orig = check_orig_model()
+    show_orig_model_info()
 
     unfold("f")
     show_eliminable_locations()
-    session().get_loc_info()
+    show_loc_info()
+    eliminate({"f": True})  # this locatino is lucky so eliminate it
     show_pcfp_stats()
     show_as_prism()
 

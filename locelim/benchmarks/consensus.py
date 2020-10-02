@@ -46,7 +46,7 @@ if __name__ == "__main__":
     eliminate({"pc1": 2, "pc2": 2})
     show_eliminable_locations()
 
-    session().get_loc_info()
+    show_loc_info()
 
     show_pcfp_stats()
     session()._pcfp.remove_duplicate_cmds()

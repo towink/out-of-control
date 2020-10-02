@@ -183,7 +183,7 @@ class PCFP:
                 solver.add(upper_bound)
             solver.push()
             if solver.check() == SmtCheckResult.Unsat:
-                #if not silent:
+                # if not silent:
                 #    print("smt solver returned UNSAT")
                 continue
             destinations = [Command.Destination(p, u, t) for p, u, t in zip(probabilities, updates, targets)]
@@ -195,12 +195,12 @@ class PCFP:
     def eliminate_loc(self, loc):
         logging.info("eliminating {}".format(loc))
         t_start = time.time()
-        to_eliminate = self.get_destinations_with_target(loc)
+        to_eliminate = self.get_destinations_with_target(loc, include_selfloops=False)
         while to_eliminate:
             cmd, dest = to_eliminate.pop()  # only need one item of to_eliminate, so could be optimized
             logging.debug("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
             self.eliminate_transition(cmd, dest)
-            to_eliminate = self.get_destinations_with_target(loc)
+            to_eliminate = self.get_destinations_with_target(loc, include_selfloops=False)
         for cmd in self.get_commands_with_source(loc):
             self._commands.remove(cmd)
         t_end = time.time()
@@ -311,43 +311,66 @@ class PCFP:
         return [loc for loc in self.get_locs() if
                 all(map(lambda cmd: not cmd.has_selfloop(), self.get_commands_with_source(loc)))]
 
+    def is_loc_potential_goal(self, loc, goal_predicate):
+        goal_pred_loc_substituted = goal_predicate.substitute(loc).simplify()
+        solver = Z3SmtSolver(self.original_jani.expression_manager)
+        solver.add(goal_pred_loc_substituted)
+        solver.push()
+        check_res = solver.check()
+        if check_res == SmtCheckResult.Unsat:
+            return False
+        else:
+            return True
+
     # the locations that have no self loops, are not possibly initial or final
-    def get_eliminable_locs(self, target_predicate: sp.Expression) -> []:
+    def get_eliminable_locs(self, goal_predicate: sp.Expression) -> []:
         result = []
-        # I have tried to not create a new solver in each iteration but had difficulties with that
         for loc in self.get_locs_without_selfloops():
-            goal_pred_loc_substituted = target_predicate.substitute(loc).simplify()
-            solver = Z3SmtSolver(self.original_jani.expression_manager)
-            solver.add(goal_pred_loc_substituted)
-            solver.push()
-            check_res = solver.check()
-            if not self.is_loc_possibly_initial(loc) and check_res == SmtCheckResult.Unsat:
+            if not self.is_loc_possibly_initial(loc) and not self.is_loc_potential_goal(loc, goal_predicate):
                 result.append(loc)
         return result
 
+    def is_loc_sink_without_target(self, loc, goal_predicate):
+        # all outgoing transitions are self loops and loc is no potential goal
+        if self.is_loc_potential_goal(loc, goal_predicate):
+            return False
+        for cmd in self.get_commands_with_source(loc):
+            # if some command at loc has a non self-loop transition then loc is no sink
+            if not cmd.has_only_selfloops():
+                return False
+        return True
+
+    def get_sink_locs_without_targets(self, goal_predicate):
+        return [loc for loc in self.get_locs() if self.is_loc_sink_without_target(loc, goal_predicate)]
+
+    def is_loc_lucky(self, loc):
+        # loc is lucky if it does have self-loops but can be eliminated anyway (by eliminate(loc))
+        cmds = self.get_commands_with_source(loc)
+        selfloops = [cmd for cmd in cmds if cmd.has_selfloop()]
+        if not selfloops:
+            # if the location has no self loop at all then don't consider it
+            return False
+        ingoing = [(cmd, dest) for (cmd, dest) in self.get_destinations_with_target(loc)
+                   if not are_locs_equal(cmd.source_loc, loc)]
+        solver = Z3SmtSolver(self.get_manager())
+        for cmd, dest in ingoing:
+            for loop in selfloops:
+                solver.reset()
+                query = sp.Expression.And(cmd.guard, dest.update.wp(loop.guard))
+                solver.add(query)
+                solver.push()
+                check_res = solver.check()
+                if check_res != SmtCheckResult.Unsat:
+                    # if some combination of self loop and ingoing transition is sat then we are not lucky
+                    return False
+        return True
 
     def get_lucky_locs(self):
+        result = []
         for loc in self.get_locs():
-            cmds = self.get_commands_with_source(loc)
-            selfloops = [cmd for cmd in cmds if cmd.has_selfloop]
-            if not selfloops:
-                # if the location has no self loop at all then don't consider it
-                continue
-            ingoing = [(cmd, dest) for (cmd, dest) in self.get_destinations_with_target(loc)
-                       if not are_locs_equal(cmd.source_loc, loc)]
-            print("loc {} has {} selfloops, {} ingoing".format(loc, len(selfloops), len(ingoing)))
-            solver = Z3SmtSolver(self.get_manager())
-            for cmd, dest in ingoing:
-                for loop in selfloops:
-                    solver.reset()
-                    query = sp.Expression.And(cmd.guard, dest.update.wp(loop.guard))
-                    solver.add(query)
-                    solver.push()
-                    check_res = solver.check()
-                    if check_res == SmtCheckResult.Unsat:
-                        print(query)
-
-
+            if self.is_loc_lucky(loc):
+                result.append(loc)
+        return result
 
     def get_commands_without_selfloops(self):
         return [cmd for cmd in self._commands if not cmd.has_selfloop()]
@@ -367,9 +390,11 @@ class PCFP:
                     break
         return result
 
-    def get_destinations_with_target(self, target_loc):
+    def get_destinations_with_target(self, target_loc, include_selfloops=True):
         result = []
         for cmd in self._commands:
+            if not include_selfloops and are_locs_equal(cmd.source_loc, target_loc):
+                continue
             result += [(cmd, dest) for dest in cmd.destinations if are_locs_equal(dest.target_loc, target_loc)]
         return result
 

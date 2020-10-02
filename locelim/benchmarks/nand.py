@@ -11,7 +11,7 @@ def nand():
     load_model("originals/nand.prism")
     show_model_constants()
     set_property("P=? [ F s=4 & z/N<0.1 ]")
-    constant_defs = {'N': 40, 'K': 4}
+    constant_defs = {'N': 2, 'K': 1}
     def_model_constants(constant_defs)
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)

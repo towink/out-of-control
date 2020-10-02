@@ -96,6 +96,7 @@ def brp():
     session().unfold("r")
     session().unfold("s")
     session().eliminate_all()
+    session().eliminate({"r":2 , "s": 6})  # this location is "lucky", it has self loop but can be eliminated
     session().unfold("l")
     session().unfold("k")
     session().eliminate_all()
@@ -111,6 +112,11 @@ def brp():
     res_simpl, time_check_simpl = session().check_model(return_time=True)
     states_simpl = len(model_simpl.states)
     transitions_simpl = model_simpl.nr_transitions
+
+    print("result orig: {}".format(res_orig))
+    print("result simpl: {}".format(res_simpl))
+
+    # collect info for benchmark table
 
     stat_vars = ['states_orig', 'transitions_orig',
                  'states_simpl', 'transitions_simpl',
@@ -129,4 +135,4 @@ def brp():
 
 if __name__ == "__main__":
     benchmark_info = brp()
-    print(to_latex_string(benchmark_info))
+    #print(to_latex_string(benchmark_info))

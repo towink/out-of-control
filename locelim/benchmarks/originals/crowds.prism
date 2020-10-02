@@ -27,7 +27,7 @@ module crowds
 	runCount: [0..TotalRuns] init TotalRuns;   // Counts protocol instances
 	start:    bool init false;      // Start the protocol?
 	run:      bool init false;      // Run the protocol?
-	// manually changed init value here
+	// MANUALLY CHANGED INIT VAL
 	lastSeen: [0..MaxGood] init 20;   // Last crowd member to touch msg
 	good:     bool init false;      // Crowd member is good?
 	bad:      bool init false;      //              ... bad?

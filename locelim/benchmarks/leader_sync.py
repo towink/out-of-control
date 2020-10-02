@@ -21,14 +21,14 @@ if __name__ == "__main__":
     show_pcfp_stats()
 
     unfold("s1")
-    show_eliminable_locations()
+    #show_eliminable_locations()
     eliminate_all()
-    show_pcfp_stats()
+    #show_pcfp_stats()
 
     unfold("c")
-    show_eliminable_locations()
+    #show_eliminable_locations()
     eliminate({"s1": 1, "c": 2})
-    show_eliminable_locations()
+    #show_eliminable_locations()
     show_loc_info()
 
     show_pcfp_stats()

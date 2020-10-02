@@ -64,6 +64,10 @@ class Command:
     def has_selfloop(self) -> bool:
         return any([are_locs_equal(self._source_loc, dest.target_loc) for dest in self._destinations])
 
+    def has_only_selfloops(self) -> bool:
+        # true if all transitions are self loops
+        return all([are_locs_equal(self._source_loc, dest.target_loc) for dest in self._destinations])
+
     def has_nop_selfloop(self) -> bool:
         return any([dest.update.is_nop() for dest in self._destinations])
 
