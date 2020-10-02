@@ -53,6 +53,9 @@ class Update:
     def substitute(self, subst_map):
         raise NotImplementedError
 
+    def to_subst_map(self) -> Dict[sp.Variable, sp.Expression]:
+        raise NotImplementedError
+
     def evaluate(self, subst_map):
         raise NotImplementedError
 

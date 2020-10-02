@@ -8,6 +8,8 @@ from locelim.datastructures.PCFP import PCFP
 from locelim.datastructures.util import primitive_type_to_exp, are_locs_equal
 
 
+from locelim.benchmarks.analyser import analyse_locations
+
 class Session:
     """Encapsulates an interactive elimination session
 
@@ -280,3 +282,9 @@ class Session:
         """Saves the current PCFP as a prism file"""
         with open(path, "w") as f:
             f.write(self._pcfp.to_prism_string())
+
+    def analyse_locations(self):
+        analyse_locations(self._pcfp)
+
+    def eliminate_unsatisfiable_commands(self):
+        self._pcfp.eliminate_unsatisfiable_commands()

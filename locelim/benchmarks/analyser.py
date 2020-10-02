@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 import stormpy as sp
 from stormpy.utility.utility import Z3SmtSolver, SmtCheckResult
 
-import locelim.interactive.commands
+# import locelim.interactive.commands
 import unfolder
 from locelim.datastructures.PCFP import PCFP
 from locelim.datastructures.command import Command
@@ -78,12 +78,11 @@ def analyse_potential_unfolds(orig_pcfp):
 def analyse_locations(pcfp, silent=False, max_new_transitions=100):
     best_unfold = None
     min_unfold_transitions = max_new_transitions  # Adjusts the cutoff after which eliminating a location is considered worse than keeping it
-    initial_loc = pcfp.get_initial_location()
     for loc in pcfp.get_locs():
         if not silent:
             print("  Location " + str(loc))
 
-        if are_locs_equal(initial_loc, loc):
+        if pcfp.is_loc_possibly_initial(loc):
             if not silent:
                 print("  Location is initial. Skipping location.")
             continue
@@ -105,6 +104,7 @@ def analyse_locations(pcfp, silent=False, max_new_transitions=100):
         outgoing_commands = pcfp.get_commands_with_source(loc)
         self_loops_reachable = 0
         self_loops_not_reachable = 0
+        print_max = 10
         for cmd in outgoing_commands:
             cmd: Command
             for dest in cmd.destinations:
@@ -112,15 +112,15 @@ def analyse_locations(pcfp, silent=False, max_new_transitions=100):
                 if are_locs_equal(dest.target_loc, loc):
                     reachable = is_loop_reachable(incoming_guards_and_assigs, cmd.guard, pcfp)
                     if not reachable:
-                        if self_loops_not_reachable < 3 and not silent:
+                        if self_loops_not_reachable < print_max and not silent:
                             print("    Self-loop. Not reachable.")
                         self_loops_not_reachable += 1
                     else:
-                        if self_loops_reachable < 3 and not silent:
+                        if self_loops_reachable < print_max and not silent:
                             print("    Self-loop. Reachable." + str(dest.update))
                         self_loops_reachable += 1
 
-        if (self_loops_not_reachable >= 3 or self_loops_reachable >= 3) and not silent:
+        if (self_loops_not_reachable >= print_max or self_loops_reachable >= print_max) and not silent:
             print("    ... (total " + str(self_loops_not_reachable + self_loops_reachable) + ", " + str(self_loops_reachable) + " reachable)")
         if self_loops_reachable == 0:
             total_transitions = len(incoming_guards_and_assigs) * len(outgoing_commands)
