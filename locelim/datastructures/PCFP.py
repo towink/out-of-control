@@ -265,6 +265,40 @@ class PCFP:
     def count_destinations(self):
         return sum([cmd.count_destinations() for cmd in self._commands])
 
+    def eliminate_unsatisfiable_commands(self):
+        counter = 0
+        for loc in self.get_locs():
+            if self.is_loc_possibly_initial(loc):
+                continue
+
+            incoming_dests = self.get_destinations_with_target(loc)
+            outgoing_commands = self.get_commands_with_source(loc)
+
+            for outgoing in outgoing_commands:
+                outgoing: Command
+                reachable = False
+                for (cmd, dest) in incoming_dests:
+                    cmd: Command
+                    dest: Command.Destination
+                    wp_out = dest.update.wp(outgoing.guard)
+                    total_guard: sp.Expression = sp.Expression.And(cmd.guard, wp_out)
+                    solver = Z3SmtSolver(total_guard.manager)
+                    solver.add(total_guard)
+                    for var in total_guard.get_variables():
+                        var: sp.Variable
+                        if var in self._undef_constants or not var in self.int_variables_bounds:
+                            continue
+                        solver.add(sp.Expression.Geq(var.get_expression(), self.get_lower_bound(var)))
+                        solver.add(sp.Expression.Leq(var.get_expression(), self.get_upper_bound(var)))
+                    solver.push()
+                    if solver.check() != SmtCheckResult.Unsat:
+                        reachable = True
+                        break
+                if not reachable:
+                    self.commands.remove(outgoing)
+                    counter += 1
+        logging.info("removed {} unsatisfiable commands".format(counter))
+
     def get_initial_location(self):
         locs = self.get_locs()
         for loc in locs:
