@@ -282,6 +282,14 @@ class PCFP:
                     dest: Command.Destination
                     wp_out = dest.update.wp(outgoing.guard)
                     total_guard: sp.Expression = sp.Expression.And(cmd.guard, wp_out)
+
+                    if not total_guard.contains_variables():
+                        if total_guard.evaluate_as_bool():
+                            reachable = True
+                            break
+                        else:
+                            continue
+
                     solver = Z3SmtSolver(total_guard.manager)
                     solver.add(total_guard)
                     for var in total_guard.get_variables():
