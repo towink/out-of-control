@@ -124,9 +124,25 @@ class PCFP:
     def add_command(self, cmd: Command):
         self._commands.append(cmd)
 
+    def is_unfoldable(self, var: sp.Variable):
+        for cmd in self._commands:
+            for dest in cmd.destinations:
+                subst_map = dest.update.to_subst_map()
+                if var in subst_map:
+                    subst_term: sp.Expression = subst_map[var]
+                    variables = subst_term.get_variables()
+                    if len(variables) > 1 or (len(variables) == 1 and next(iter(variables)) != var):
+                        logging.info("{} is not unfoldable as it is assigned the value \"{}\"".format(
+                            str(var), str(subst_term)
+                        ))
+                        return False
+        return True
+
     def unfold(self, var: sp.Variable):
         """Unfolds the given variable into the location space"""
-        # TODO unfoldability is not checked yet
+        if not self.is_unfoldable(var):
+            raise Exception("The variable cannot be unfolded")
+
         substitutions = [{var: val} for val in self.get_values_for_variable(var)]
         logging.info("unfolding {} will create {} new locations"
                      .format(var.name, (len(substitutions) - 1) * len(self.get_locs())))
