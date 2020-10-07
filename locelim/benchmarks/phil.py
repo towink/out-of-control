@@ -19,6 +19,7 @@ if __name__ == "__main__":
 
     unfold("p1")
     show_eliminable_locations()
+    session().eliminate_unsatisfiable_commands()
 
     model = session().build_model()
     print(model)

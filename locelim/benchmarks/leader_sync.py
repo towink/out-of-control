@@ -30,6 +30,7 @@ if __name__ == "__main__":
     eliminate({"s1": 1, "c": 2})
     #show_eliminable_locations()
     show_loc_info()
+    session().eliminate_unsatisfiable_commands()
 
     show_pcfp_stats()
 
