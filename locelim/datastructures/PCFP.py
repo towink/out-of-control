@@ -48,6 +48,7 @@ class PCFP:
     def __init__(self, original_jani: sp.JaniModel):
         self._commands = []
         self.int_variables_bounds = {}
+        self.boolean_variables = []
         self.initial_values = {}
         self.initial_locs = set()
         self._undef_constants = []
