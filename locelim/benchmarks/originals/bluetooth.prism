@@ -259,7 +259,8 @@ endmodule
 
 
 //----------------------------------------------------------------------------------------------------------------------------
-const int mrec; // after receiving mrec messages the inquiry is stopped
+// SET MANUALLY TO 1
+const int mrec = 1; // after receiving mrec messages the inquiry is stopped
 
 // counts the number of replies received
 module replies

@@ -9,7 +9,7 @@ if __name__ == "__main__":
     #def_model_constants({"mu" :0.1, "lambda": 1})
 
     # I made this property up
-    #set_property("Pmax=? [ F ((p1>=8)&(p1<=9))|((p2>=8)&(p2<=9))|((p3>=8)&(p3<=9)) ]")
+    # set_property("Pmax=? [ F ((p1>=8)&(p1<=9))|((p2>=8)&(p2<=9))|((p3>=8)&(p3<=9)) ]")
 
 
     show_orig_model_info()
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     unfold("k_1")
     #show_as_prism()
     unfold("k_2")
-    #unfold("k_3")
+    unfold("k_3")
     #unfold("k_4")
     #unfold("k_5")
     show_loc_info()

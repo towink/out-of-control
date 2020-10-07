@@ -11,23 +11,45 @@ module coupon
     c1: bool;
     c2: bool;
     c3: bool;
+    c4: bool;
+    c5: bool;
+    c6: bool;
+    c7: bool;
+    c8: bool;
+    c9: bool;
 
     // counter for number of draws
     c: [0..N];
 
-    //
-    draw: [0..3];
+    // coupon that was drawn
+    draw: [0..9];
 
+    // local state
     s: [0..2];
 
-    [] (s=0) -> 0.25: (draw'=0) & (s'=1) + 0.25: (draw'=1) & (s'=1) + 0.25: (draw'=2) & (s'=1) + 0.25: (draw'=3) & (s'=1);
+    [] (s=0) ->   0.1: (draw'=0) & (s'=1)
+                + 0.1: (draw'=1) & (s'=1)
+                + 0.1: (draw'=2) & (s'=1)
+                + 0.1: (draw'=3) & (s'=1)
+                + 0.1: (draw'=4) & (s'=1)
+                + 0.1: (draw'=5) & (s'=1)
+                + 0.1: (draw'=6) & (s'=1)
+                + 0.1: (draw'=7) & (s'=1)
+                + 0.1: (draw'=8) & (s'=1)
+                + 0.1: (draw'=9) & (s'=1);
 
-    [] (s=1 & draw=0) -> 1: (c0'=true) & (s'=2) & (c'=max(N,c+1));
-    [] (s=1 & draw=1) -> 1: (c1'=true) & (s'=2) & (c'=max(N,c+1));
-    [] (s=1 & draw=2) -> 1: (c2'=true) & (s'=2) & (c'=max(N,c+1));
-    [] (s=1 & draw=3) -> 1: (c3'=true) & (s'=2) & (c'=max(N,c+1));
+    [] (s=1 & draw=0) -> 1: (c0'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=1) -> 1: (c1'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=2) -> 1: (c2'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=3) -> 1: (c3'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=4) -> 1: (c4'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=5) -> 1: (c5'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=6) -> 1: (c6'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=7) -> 1: (c7'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=8) -> 1: (c8'=true) & (s'=2) & (c'=min(N,c+1));
+    [] (s=1 & draw=9) -> 1: (c9'=true) & (s'=2) & (c'=min(N,c+1));
 
-    [] (s=2 & (c0 & c1 & c2 & c3)) -> true;
-    [] (s=2 & !(c0 & c1 & c2 & c3)) -> (s'=0);
+    [] (s=2 & (c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9)) -> true;
+    [] (s=2 & !(c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9)) -> (s'=0);
 
 endmodule
