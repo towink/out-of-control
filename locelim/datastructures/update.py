@@ -175,6 +175,8 @@ class AtomicUpdate(Update):
         return result
 
     def to_prism_string(self) -> str:
+        if len(self._parallel_asgs) == 0:
+            return "true"
         return " & ".join(["({}'={})".format(asg.lhs.name, str(asg.rhs)) for asg in self._parallel_asgs])
 
     def __str__(self):
