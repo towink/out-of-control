@@ -10,9 +10,7 @@ def csma():
 
     load_model("originals/csma.2-2.v1.prism")
     show_model_constants()
-    set_property("Pmin=? [ F min_backoff_after_success<K ]")
-    constant_defs = {} # "N": 10, "MAX": 20}
-    def_model_constants(constant_defs)
+    set_property("Pmin=? [ F min(s1=4?cd1:2+1,s2=4?cd2:2+1)<2 ]")  # manually adapted
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
@@ -28,21 +26,13 @@ def csma():
 
     # actual simplification starts here
     session().unfold("s1")
-    # session().unfold("s")
-    # session().eliminate_all()
-    # session().eliminate({"r":2 , "s": 6})  # this location is "lucky", it has self loop but can be eliminated
-    # session().unfold("l")
-    # session().unfold("k")
-    # session().eliminate_all()
-    # session().unfold("srep")
-    # session().eliminate_all()
-    # session().unfold("s_ab")
-    # session().eliminate_all()
+    session().unfold("s2")
+    show_eliminable_locations()
+    eliminate_all()
+    # end simplification
 
     t_end = time.time()
     time_simplification = t_end - t_start
-
-    session().show_as_prism()
 
     model_simpl, time_build_simpl = session().build_model(return_time=True)
     res_simpl, time_check_simpl = session().check_model(return_time=True)
@@ -61,8 +51,8 @@ def csma():
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'brp'
-    benchmark_info['constant_defs'] = constant_defs
+    benchmark_info['name'] = 'csma'
+    benchmark_info['constant_defs'] = {}
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
 
