@@ -48,6 +48,8 @@ class Session:
             constant = prism_model.get_constant(constant_string).expression_variable
             if type(value) is int:
                 result[constant] = prism_model.expression_manager.create_integer(value)
+            elif type(value) is bool:
+                result[constant] = prism_model.expression_manager.create_boolean(value)
             else:
                 raise NotImplementedError
         return result
