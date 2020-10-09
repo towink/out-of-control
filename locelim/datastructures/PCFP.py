@@ -228,8 +228,22 @@ class PCFP:
         logging.info("elimination took {}s".format(t_end - t_start))
 
     def remove_duplicate_cmds(self):
-        # TODO probably does not work like this ...
-        self._commands = list(set(self._commands))
+        dupls = len(self._commands) * [False]
+        for i in range(len(self._commands)):
+            if dupls[i]:
+                continue
+            for j in range(i - 1):
+                if self._commands[i].is_equal_except_guard(self._commands[j]):
+                    dupls[j] = True
+                    guard_i, guard_j = self._commands[i].guard, self._commands[j].guard
+                    joint_guard: sp.Expression = sp.Expression.Or(guard_i, guard_j)
+                    joint_guard = joint_guard.simplify()
+                    self._commands[i].guard = joint_guard
+
+        self._commands = [cmd for i, cmd in enumerate(self._commands) if not dupls[i]]
+
+        removed = len([() for i, dup in enumerate(dupls) if dup])
+        logging.info("removed {} duplicate commands".format(removed))
 
     def eliminate_unreachable(self):
         # TODO this seems to be quite slow ...
@@ -516,8 +530,13 @@ class PCFP:
         for var in self.boolean_variables:
             res += "\t{}: bool init {};\n".format(var.name, self.initial_values[var])
 
-        for cmd in self._commands:
-            res += "\t{}\n".format(cmd.to_prism_string())
+        # for cmd in self._commands:
+        #     res += "\t{}\n".format(cmd.to_prism_string())
+
+        for loc in self.get_locs():
+            cmds = self.get_commands_with_source(loc)
+            for cmd in cmds:
+                res += "\t{}\n".format(cmd.to_prism_string())
 
         res += "endmodule"
         return res

@@ -174,6 +174,18 @@ class AtomicUpdate(Update):
                 result[var] = subst_map[var]
         return result
 
+    def is_equal(self, other: AtomicUpdate):
+        self_subst, other_subst = self.to_subst_map(), other.to_subst_map()
+        if len(self_subst) != len(other_subst):
+            return False
+        for var in self_subst:
+            if var not in other_subst:
+                return False
+            self_asg_str, other_asg_str = str(self_subst[var]), str(other_subst[var])
+            if self_asg_str != other_asg_str:
+                return False
+        return True
+
     def to_prism_string(self) -> str:
         if len(self._parallel_asgs) == 0:
             return "true"

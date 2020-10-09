@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Dict
 
 from locelim.datastructures.update import Update
@@ -26,6 +28,18 @@ class Command:
 
         def target_loc_to_prism_string(self) -> str:
             return " & ".join(["({}'={})".format(var.name, str(self.target_loc[var])) for var in self.target_loc])
+
+        def is_equal(self, other: Command.Destination):
+            if not are_locs_equal(self.target_loc, other.target_loc):
+                return False
+
+            eq: sp.Expression = self.probability.Eq(self.probability, other.probability).simplify()
+            if eq.contains_variables():
+                return False
+            if not eq.evaluate_as_bool():
+                return False
+
+            return self.update.is_equal(other.update)
 
         def to_prism_string(self) -> str:
             if len(self.update._parallel_asgs) > 0 and self.target_loc != {}:
@@ -84,9 +98,36 @@ class Command:
     def is_guard_false(self):
         return not self._guard.contains_variables() and self._guard.evaluate_as_bool() is False
 
+    def is_equal_except_guard(self, other: Command):
+        if not are_locs_equal(self._source_loc, other._source_loc):
+            return False
+        if len(self._destinations) != len(other._destinations):
+            return False
+        destinations_matched = len(self._destinations) * [False]
+        for self_dest in self._destinations:
+            self_dest: Command.Destination
+
+            for i, other_dest in enumerate(other._destinations):
+                other_dest: Command.Destination
+
+                if destinations_matched[i]:
+                    continue
+                if self_dest.is_equal(other_dest):
+                    destinations_matched[i] = True
+                    break
+
+        if False in destinations_matched:
+            return False
+
+        return True
+
     @property
     def guard(self) -> sp.Expression:
         return self._guard
+
+    @guard.setter
+    def guard(self, val: sp.Expression):
+        self._guard = val
 
     @property
     def source_loc(self):
@@ -106,5 +147,5 @@ class Command:
         return res
 
     def to_prism_string(self) -> str:
-        destinations_string = " + ".join([dest.to_prism_string() for dest in self._destinations])
-        return "[] {} {} -> {};".format(self.source_loc_to_prism_string(), self._guard, destinations_string)
+        destinations_string = " + \n\t\t".join([dest.to_prism_string() for dest in self._destinations])
+        return "[] {} {} -> \n\t\t{};".format(self.source_loc_to_prism_string(), self._guard, destinations_string)
