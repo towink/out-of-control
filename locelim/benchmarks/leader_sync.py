@@ -52,7 +52,7 @@ def leader_sync():
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'leader_sync'
+    benchmark_info['name'] = 'leader\\_sync'
     benchmark_info['constant_defs'] = {}
 
     for key, value in benchmark_info.items():

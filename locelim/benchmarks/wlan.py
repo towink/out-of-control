@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     load_model("originals/wlan.0.v1.prism")
     show_model_constants()
-    def_model_constant('COL', 0)
+    def_model_constant('COL', 2)
     show_orig_model_info()
 
     set_property("Pmax=? [ F col=COL ]")
@@ -52,10 +52,10 @@ if __name__ == "__main__":
     #
     # show_pcfp_stats()
 
-    show_as_prism()
+    #show_as_prism()
     model = session().build_model()
     print(model)
-    session().check_model()
+    print(session().check_model())
 
     #res = analyse_locations(session()._pcfp)
     #print(res)

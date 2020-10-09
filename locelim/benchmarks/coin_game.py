@@ -58,6 +58,9 @@ def coin_game(constant_defs=None):
     # actual simplification starts here
     session().unfold("f")
     session().eliminate({"f": True})  # this location is lucky so eliminate it
+    #session().eliminate_unsatisfiable_commands()
+    #session().eliminate_all()
+    # end of simplificaiton
 
     t_end = time.time()
     time_simplification = t_end - t_start

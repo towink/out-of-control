@@ -82,68 +82,68 @@ module crowds
 	//          forwarder randomly chooses the next forwarder.
 	//          Here, the identity of an honest forwarder is randomly
 	//          chosen *after* it has forwarded the message.
-	[] recordLast & CrowdSize=2 ->
-	        1/2 : (lastSeen'=0) & (recordLast'=false) & (run'=true) +
-	        1/2 : (lastSeen'=1) & (recordLast'=false) & (run'=true);
-	[] recordLast & CrowdSize=4 ->
-	        1/4 : (lastSeen'=0) & (recordLast'=false) & (run'=true) +
-	        1/4 : (lastSeen'=1) & (recordLast'=false) & (run'=true) +
-	        1/4 : (lastSeen'=2) & (recordLast'=false) & (run'=true) +
-	        1/4 : (lastSeen'=3) & (recordLast'=false) & (run'=true);
+//	[] recordLast & CrowdSize=2 ->
+//	        1/2 : (lastSeen'=0) & (recordLast'=false) & (run'=true) +
+//	        1/2 : (lastSeen'=1) & (recordLast'=false) & (run'=true);
+//	[] recordLast & CrowdSize=4 ->
+//	        1/4 : (lastSeen'=0) & (recordLast'=false) & (run'=true) +
+//	        1/4 : (lastSeen'=1) & (recordLast'=false) & (run'=true) +
+//	        1/4 : (lastSeen'=2) & (recordLast'=false) & (run'=true) +
+//	        1/4 : (lastSeen'=3) & (recordLast'=false) & (run'=true);
 	[] recordLast & CrowdSize=5 ->
 	        1/5 : (lastSeen'=0) & (recordLast'=false) & (run'=true) +
 	        1/5 : (lastSeen'=1) & (recordLast'=false) & (run'=true) +
 	        1/5 : (lastSeen'=2) & (recordLast'=false) & (run'=true) +
 	        1/5 : (lastSeen'=3) & (recordLast'=false) & (run'=true) +
 	        1/5 : (lastSeen'=4) & (recordLast'=false) & (run'=true);
-	[] recordLast & CrowdSize=10 ->
-	        1/10 : (lastSeen'=0) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=1) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=2) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=3) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=4) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=5) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=6) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=7) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=8) & (recordLast'=false) & (run'=true) +
-	        1/10 : (lastSeen'=9) & (recordLast'=false) & (run'=true);
-	[] recordLast & CrowdSize=15 ->
-	        1/15 : (lastSeen'=0)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=1)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=2)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=3)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=4)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=5)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=6)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=7)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=8)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=9)  & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=10) & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=11) & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=12) & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=13) & (recordLast'=false) & (run'=true) +
-	        1/15 : (lastSeen'=14) & (recordLast'=false) & (run'=true);
-	[] recordLast & CrowdSize=20 ->
-	        1/20 : (lastSeen'=0)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=1)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=2)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=3)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=4)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=5)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=6)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=7)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=8)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=9)  & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=10) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=11) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=12) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=13) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=14) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=15) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=16) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=17) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=18) & (recordLast'=false) & (run'=true) +
-	        1/20 : (lastSeen'=19) & (recordLast'=false) & (run'=true);
+//	[] recordLast & CrowdSize=10 ->
+//	        1/10 : (lastSeen'=0) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=1) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=2) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=3) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=4) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=5) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=6) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=7) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=8) & (recordLast'=false) & (run'=true) +
+//	        1/10 : (lastSeen'=9) & (recordLast'=false) & (run'=true);
+//	[] recordLast & CrowdSize=15 ->
+//	        1/15 : (lastSeen'=0)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=1)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=2)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=3)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=4)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=5)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=6)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=7)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=8)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=9)  & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=10) & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=11) & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=12) & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=13) & (recordLast'=false) & (run'=true) +
+//	        1/15 : (lastSeen'=14) & (recordLast'=false) & (run'=true);
+//	[] recordLast & CrowdSize=20 ->
+//	        1/20 : (lastSeen'=0)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=1)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=2)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=3)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=4)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=5)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=6)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=7)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=8)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=9)  & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=10) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=11) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=12) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=13) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=14) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=15) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=16) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=17) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=18) & (recordLast'=false) & (run'=true) +
+//	        1/20 : (lastSeen'=19) & (recordLast'=false) & (run'=true);
 	
 	// BAD MEMBERS
 	// Remember from whom the message was received and deliver

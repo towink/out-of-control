@@ -1,30 +1,48 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string
+from locelim.benchmarks.benchmark_utils import to_latex_string, NA_latex_string
 from locelim.benchmarks.brp import brp
 from locelim.benchmarks.coin_game import coin_game
 from locelim.benchmarks.coupon import coupon
+from locelim.benchmarks.crowds import crowds
+from locelim.benchmarks.egl import egl
+from locelim.benchmarks.leader_sync import leader_sync
 from locelim.benchmarks.nand import nand
 
 
 def make_latex_table():
     res = ""
 
-    benchmark_info = nand({"N": 40, "K": 4})
-    res += to_latex_string(benchmark_info)
-
-    benchmark_info = nand({"N": 60, "K": 2})
-    res += to_latex_string(benchmark_info)
+    # benchmark_info = bluetooth()
+    res += NA_latex_string("bluetooth")
 
     benchmark_info = brp({"N": 2048, "MAX": 10})
     res += to_latex_string(benchmark_info)
-
     benchmark_info = brp({"N": 4096, "MAX": 20})
     res += to_latex_string(benchmark_info)
 
-    benchmark_info = coupon({"N": 10})
+    benchmark_info = coupon()
     res += to_latex_string(benchmark_info)
 
-    benchmark_info = coupon({"N": 100})
+    benchmark_info = crowds({'TotalRuns': 5, 'CrowdSize': 5})
     res += to_latex_string(benchmark_info)
+    benchmark_info = crowds({'TotalRuns': 10, 'CrowdSize': 5})
+    res += to_latex_string(benchmark_info)
+
+    benchmark_info = egl()
+    res += to_latex_string(benchmark_info)
+
+    benchmark_info = leader_sync()
+    res += to_latex_string(benchmark_info)
+
+    benchmark_info = nand({"N": 40, "K": 4})
+    res += to_latex_string(benchmark_info)
+    benchmark_info = nand({"N": 60, "K": 2})
+    res += to_latex_string(benchmark_info)
+
+    # benchmark_info = oscillators()
+    res += NA_latex_string("oscillators")
+
+
+    res += "\\hline\n"
 
     benchmark_info = coin_game({"N": 10000})
     res += to_latex_string(benchmark_info)

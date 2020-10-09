@@ -42,7 +42,7 @@ def zeroconf():
     t_end = time.time()
     time_simplification = t_end - t_start
 
-    session().show_as_prism()
+    #session().show_as_prism()
 
     model_simpl, time_build_simpl = session().build_model(return_time=True)
     res_simpl, time_check_simpl = session().check_model(return_time=True)
