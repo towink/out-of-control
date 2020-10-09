@@ -147,5 +147,5 @@ class Command:
         return res
 
     def to_prism_string(self) -> str:
-        destinations_string = " + \n\t\t".join([dest.to_prism_string() for dest in self._destinations])
-        return "[] {} {} -> \n\t\t{};".format(self.source_loc_to_prism_string(), self._guard, destinations_string)
+        destinations_string = " + ".join([dest.to_prism_string() for dest in self._destinations])
+        return "[] {} {} -> {};".format(self.source_loc_to_prism_string(), self._guard, destinations_string)

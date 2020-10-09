@@ -530,13 +530,8 @@ class PCFP:
         for var in self.boolean_variables:
             res += "\t{}: bool init {};\n".format(var.name, self.initial_values[var])
 
-        # for cmd in self._commands:
-        #     res += "\t{}\n".format(cmd.to_prism_string())
-
-        for loc in self.get_locs():
-            cmds = self.get_commands_with_source(loc)
-            for cmd in cmds:
-                res += "\t{}\n".format(cmd.to_prism_string())
+        for cmd in self._commands:
+            res += "\t{}\n".format(cmd.to_prism_string())
 
         res += "endmodule"
         return res
