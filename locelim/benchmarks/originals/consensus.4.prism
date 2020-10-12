@@ -13,7 +13,7 @@ const int right = 2*(K+1)*N - N;
 
 // shared coin
 // init value and bound was modified by hand (was constant range/counter_init)
-global counter : [0..((2 * (K + 1)) * 2)] init (K+1)*2;
+global counter : [0..2*(K+1)*4] init (K+1)*4;
 
 module process1
 	

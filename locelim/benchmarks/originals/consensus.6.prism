@@ -12,7 +12,7 @@ const int left = N;
 const int right = 2*(K+1)*N - N;
 
 // shared coin
-global counter : [0..range] init counter_init;
+global counter : [0..2*(K+1)*6] init (K+1)*6;
 
 module process1
 	

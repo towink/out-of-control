@@ -27,17 +27,25 @@ def zeroconf():
     t_start = time.time()
 
     # actual simplification starts here
-    # session().unfold("s1")
-    # session().unfold("s")
-    # session().eliminate_all()
-    # session().eliminate({"r":2 , "s": 6})  # this location is "lucky", it has self loop but can be eliminated
-    # session().unfold("l")
-    # session().unfold("k")
-    # session().eliminate_all()
-    # session().unfold("srep")
-    # session().eliminate_all()
-    # session().unfold("s_ab")
-    # session().eliminate_all()
+    unfold("l")
+    show_eliminable_locations()
+    eliminate_all()
+
+    unfold("mess")
+    unfold("b")
+    show_eliminable_locations()
+    eliminate_all()
+
+    unfold("z")
+    session().eliminate_unsatisfiable_commands()
+    show_eliminable_locations()
+    eliminate_all()
+
+    unfold("ip")
+    session().eliminate_unsatisfiable_commands()
+    show_eliminable_locations()
+    eliminate_all()
+    show_loc_info()
 
     t_end = time.time()
     time_simplification = t_end - t_start

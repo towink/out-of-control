@@ -94,6 +94,7 @@ class Session:
             raise Exception("another model is already loaded")
         logging.info("parsing prism model {} ...".format(path_to_prism))
         prism_model = sp.parse_prism_program(path_to_prism)
+
         self._exp_mgr = prism_model.expression_manager
         logging.info("converting prism model to jani ...")
         jani_model, _ = prism_model.to_jani([])
@@ -220,14 +221,18 @@ class Session:
             loc_converted[var_sp] = val_exp
         self._pcfp.eliminate_loc(loc_converted)
 
-    def eliminate_all(self):
+    def eliminate_all(self, max=None):
         if self._property is None:
             logging.warning("eliminating without property")
         goal_predicate = self._get_goal_predicate()
         to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
-        while to_eliminate:
+        count = 0
+        if max is None:
+            max = 10**10
+        while to_eliminate and count < max:
             loc = to_eliminate.pop()
             self._pcfp.eliminate_loc(loc)
+            count += 1
             to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
 
     def get_loc_info(self):

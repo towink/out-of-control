@@ -143,6 +143,7 @@ class PCFP:
                         return False
         return True
 
+
     def unfold(self, var: sp.Variable):
         """Unfolds the given variable into the location space"""
         if not self.is_unfoldable(var):
