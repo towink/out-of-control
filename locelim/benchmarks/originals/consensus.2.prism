@@ -25,7 +25,7 @@ module process1
 	// 3 - finished
 	
 	// local coin
-	coin1 : [0..1];	
+	coin1 : [0..1];
 
 	// flip coin
 	[] (pc1=0)  -> 0.5 : (coin1'=0) & (pc1'=1) + 0.5 : (coin1'=1) & (pc1'=1);

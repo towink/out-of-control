@@ -1,12 +1,11 @@
 import logging
 import time
-from typing import Dict, Generator
+from typing import Dict
 
 import stormpy as sp
 
 from locelim.datastructures.PCFP import PCFP
 from locelim.datastructures.PCFPComposition import PCFPComposition
-from locelim.datastructures.PCFPModule import Location
 from locelim.datastructures.util import primitive_type_to_exp, are_locs_equal
 
 
@@ -22,24 +21,26 @@ class Session:
     # private fields
 
     # the original prism program
-    _orig_prism_model: sp.PrismProgram
+    _orig_prism_model: sp.PrismProgram = None
+    # the original jani model converted from prism (possibly flattened)
+    _orig_jani_model: sp.JaniModel = None
     # the current pcfp where all operations are applied
-    _pcfp_composition: PCFPComposition
+    _pcfp: PCFP = None
     # the property string as specified by the user
     _property: str = None
     # the current definitions of the model constants
     _constant_defs = {}
+    _exp_mgr: sp.ExpressionManager = None
 
     def __init__(self):
         self._orig_prism_model = None
+        self._orig_jani_model = None
         self._pcfp = None
         self._property = None
         self._constant_defs = {}
+        self._exp_mgr = None
 
     # private functions
-
-    def _exp_mgr(self) -> sp.ExpressionManager:
-        return self._orig_prism_model.expression_manager
 
     def _get_constants_for_prism_model(self, prism_model) -> Dict[sp.Variable, sp.Expression]:
         # makes a constant substitution dict for the given prism from the raw user provided defs
@@ -80,7 +81,7 @@ class Session:
         # obtain prism model from the current state of the PCFP
         # stormpy cannot directly parse a prism string, so we write and read from a file
         with open("tmp.prism", "w") as f:
-            f.write(self._pcfp_composition.to_prism_string())
+            f.write(self._pcfp.to_prism_string())
         simplified_prism = sp.parse_prism_program("tmp.prism")
         constant_defs = self._get_constants_for_prism_model(simplified_prism)
         simplified_prism_constants_defined = simplified_prism.define_constants(constant_defs)
@@ -88,15 +89,29 @@ class Session:
 
     # public functions
 
+    def load_composition(self, path_to_prism: str):
+        logging.info("parsing prism model {} ...".format(path_to_prism))
+        prism_model = sp.parse_prism_program(path_to_prism)
+        pcfp_composition = PCFPComposition.from_prism(prism_model)
+        pass
+
     def load_model(self, path_to_prism: str):
         """Loads the prism model from the specified path"""
         if self._orig_prism_model is not None:
             raise Exception("another model is already loaded")
         logging.info("parsing prism model {} ...".format(path_to_prism))
         prism_model = sp.parse_prism_program(path_to_prism)
-        pcfp_composition = PCFPComposition.from_prism(prism_model)
+
+        self._exp_mgr = prism_model.expression_manager
+        logging.info("converting prism model to jani ...")
+        jani_model, _ = prism_model.to_jani([])
+        if len(jani_model.automata) > 1:
+            logging.info("model has {} modules, will be flattened".format(len(jani_model.automata)))
+            jani_model = jani_model.flatten_composition()
+        pcfp = PCFP.from_jani(jani_model)
         self._orig_prism_model = prism_model
-        self._pcfp_composition = pcfp_composition
+        self._orig_jani_model = jani_model
+        self._pcfp = pcfp
 
     def get_model_constants(self):
         """Returns all undefined constants"""
@@ -202,32 +217,30 @@ class Session:
 
     def unfold(self, var: str):
         """Unfolds the specified variable."""
-        self._pcfp_composition.unfold(self._exp_mgr().get_variable(var))
+        self._pcfp.unfold(self._exp_mgr.get_variable(var))
 
-    def eliminate(self, raw_loc: Dict[str, object]):
+    def eliminate(self, loc: Dict[str, object]):
         """Eliminate specified location (variables encoded as strings)."""
-        loc_converted = Location()
-        for var, value in raw_loc.items():
-            var_sp = self._exp_mgr().get_variable(var)
-            val_exp = primitive_type_to_exp(value, self._exp_mgr())
-            # loc_converted.val_map[var_sp] = val_exp
-            loc_converted = loc_converted.extend({var_sp: val_exp})
-        self._pcfp_composition.eliminate_loc(loc_converted)
+        loc_converted = {}
+        for var, value in loc.items():
+            var_sp = self._exp_mgr.get_variable(var)
+            val_exp = primitive_type_to_exp(value, self._exp_mgr)
+            loc_converted[var_sp] = val_exp
+        self._pcfp.eliminate_loc(loc_converted)
 
     def eliminate_all(self, max=None):
-        """eliminates all eliminable locs in the composition, in an arbitrary order"""
         if self._property is None:
             logging.warning("eliminating without property")
         goal_predicate = self._get_goal_predicate()
-        # get an arbitrary eliminable loc
-        loc_to_eliminate = next(self._pcfp_composition.eliminable_locs(goal_predicate), None)
+        to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
         count = 0
         if max is None:
             max = 10**10
-        while loc_to_eliminate and count < max:
-            self._pcfp_composition.eliminate_loc(loc_to_eliminate)
+        while to_eliminate and count < max:
+            loc = to_eliminate.pop()
+            self._pcfp.eliminate_loc(loc)
             count += 1
-            loc_to_eliminate = next(self._pcfp_composition.eliminable_locs(goal_predicate), None)
+            to_eliminate = self._pcfp.get_eliminable_locs(goal_predicate)
 
     def get_loc_info(self):
         """Returns detailed information for each location"""
@@ -250,20 +263,6 @@ class Session:
                 "selfloops": len(selfloops)
             })
         return result
-
-    def eliminable_locs(self) -> Generator:
-        """Yields the currently directly eliminable locations.
-
-        A location counts as eliminable if the following three conditions holds:
-        - the location has no self-loop
-        - it is guaranteed to be neither initial nor final
-        Note that eliminating one of these locations can make the others non-eliminable!
-        """
-        if self._property is None:
-            goal_predicate = self._exp_mgr().create_boolean(True)
-        else:
-            goal_predicate = self._get_goal_predicate()
-        yield from self._pcfp_composition.eliminable_locs(goal_predicate)
 
     def show_eliminable_locations(self):
         """Prints the currently directly eliminable locations.

@@ -67,6 +67,10 @@ class PCFP:
         return new_pcfp
 
     @classmethod
+    def from_prism_module(cls, prism_program: sp.PrismModule):
+        pass
+
+    @classmethod
     def from_jani(cls, jani_model: sp.JaniModel):
         """Constructs a PCFP from a jani model"""
         if not jani_model.check_valid():
