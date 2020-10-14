@@ -282,12 +282,12 @@ endmodule
 const int k = 1; // frequency the sender starts on
 const int T = 0; // train that the sender starts on
 
-init
-	receiver=0 & y1=0 & freq1=0 & train1=0 & // initial state of the receiver
-	rec=0 & // nothing received yet
-	f1=k & t1=T & // initial frequency of the receiver (based on its clock)
-	(send=1 |((freq=2)|(freq=4)|(freq=6)|(freq=8)|(freq=10)|(freq=12)|(freq=14)|(freq=16)))  // condition required on the sender
-endinit
+// init
+// 	   receiver=0 & y1=0 & freq1=0 & train1=0 & // initial state of the receiver
+// 	   rec=0 & // nothing received yet
+// 	   f1=k & t1=T & // initial frequency of the receiver (based on its clock)
+// 	   (send=1 |((freq=2)|(freq=4)|(freq=6)|(freq=8)|(freq=10)|(freq=12)|(freq=14)|(freq=16)))  // condition required on the sender
+// endinit
 
 //----------------------------------------------------------------------------------------------------------------------------
 

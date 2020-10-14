@@ -12,16 +12,35 @@ def bluetooth(constant_defs=None):
 
     load_model("originals/bluetooth.prism")
     set_property("P=? [ F 0=1 ]")
+
+    mgr: sp.ExpressionManager = session()._orig_prism_model.expression_manager
+    parser = sp.ExpressionParser(session()._orig_prism_model.expression_manager)
+
+    # I have no idea why this isn't done automatically:
+    parser.set_identifier_mapping({**{"0": mgr.create_integer(0),
+                                      "1": mgr.create_integer(1),
+
+                                      # Constants from the prism program:
+                                      "k": mgr.create_integer(1),
+                                      "T": mgr.create_integer(0)
+                                      },
+                                   **{key: mgr.get_variable(key).get_expression() for key in
+                                      ["receiver", "y1", "freq1", "train1", "rec", "f1", "t1", "send", "freq"]}
+                                   })
+    init_block = parser.parse("receiver=0 & y1=0 & freq1=0 & train1=0 & rec=0 & f1=k & t1=T & (send=1 |((freq=2)|(freq=4)|(freq=6)|(freq=8)|(freq=10)|(freq=12)|(freq=14)|(freq=16)))")
+
+    session()._pcfp.init_block = init_block
+
     # if constant_defs is None:
     #     constant_defs = {'mrec': 1}
     # def_model_constants(constant_defs)
 
-    # model_orig, time_build_orig = session().build_orig_model(return_time=True)
-    # res_orig, time_check_orig = session().check_orig_model(return_time=True)
-    # states_orig = model_orig.nr_states
-    # transitions_orig = model_orig.nr_transitions
+    model_orig, time_build_orig = session().build_orig_model(return_time=True)
+    res_orig, time_check_orig = session().check_orig_model(return_time=True)
+    states_orig = model_orig.nr_states
+    transitions_orig = model_orig.nr_transitions
 
-    show_as_prism()  # TODO beaks with SIGSEGV
+    show_as_prism()
 
     pcfp_stats = session().get_pcfp_stats()
     orig_locs = pcfp_stats["locations"]
@@ -32,14 +51,14 @@ def bluetooth(constant_defs=None):
 
     # actual simplification starts here
     show_pcfp_stats()
-    #unfold("f1")
+    # unfold("f1")
     # unfold("t1")
     # unfold("train1")
-    #unfold("freq1")
+    # unfold("freq1")
 
-    unfold("receiver")
-    unfold("send")
-    unfold("rec")
+    # unfold("receiver")
+    # unfold("send")
+    # unfold("rec")
 
     show_loc_info()
     # end of simplification
@@ -47,7 +66,7 @@ def bluetooth(constant_defs=None):
     t_end = time.time()
     time_simplification = t_end - t_start
 
-    model_simpl, time_build_simpl = session().build_model(return_time=True)
+    model_simpl, time_build_simpl = session().build_model(return_time=True, build_function=sp.build_symbolic_model)
     res_simpl, time_check_simpl = session().check_model(return_time=True)
     states_simpl = model_simpl.nr_states
     transitions_simpl = model_simpl.nr_transitions

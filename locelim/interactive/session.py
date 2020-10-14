@@ -143,7 +143,7 @@ class Session:
         else:
             return model
 
-    def build_model(self, return_time=False, return_simplified_prism=False):
+    def build_model(self, return_time=False, return_simplified_prism=False, build_function=sp.build_model):
         """Builds the model for the current PCFP"""
         simplified_prism_constants_defined = self._get_simplified_prism_model()
         if self._property is not None:
@@ -151,11 +151,11 @@ class Session:
             prop = self._get_property_for_prism_model(simplified_prism_constants_defined, define_constants=False)
             logging.info("start building simplified model ...")
             t_start = time.time()
-            model = sp.build_model(simplified_prism_constants_defined, [prop])
+            model = build_function(simplified_prism_constants_defined, [prop])
         else:
             logging.info("start building simplified model ...")
             t_start = time.time()
-            model = sp.build_model(simplified_prism_constants_defined)
+            model = build_function(simplified_prism_constants_defined)
         t_end = time.time()
         logging.info("finished model building, took {}s".format(t_end - t_start))
         if return_simplified_prism:
