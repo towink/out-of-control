@@ -12,20 +12,25 @@ _session = Session()
 
 
 def reset_session():
-    """Resets the current session"""
+    """Resets the current session,"""
     global _session
     _session = Session()
 
 
 def session():
-    """Returns the current session object, for more advanced use"""
+    """Returns the current session object, for more advanced use,"""
     res = _session
     return res
 
 
 def load_model(path_to_prism: str):
-    """Loads a prism model"""
+    """Loads a prism model."""
     _session.load_model(path_to_prism)
+
+
+def flatten():
+    """Flattens the current PCFP composition into a single module."""
+    _session.flatten()
 
 
 def show_model_constants():
@@ -66,8 +71,10 @@ def show_pcfp_stats():
         print("{}: {}".format(key, value))
 
 
-def show_loc_info(max_lines=1000):
+def show_loc_info(max_lines=100):
     """Prints detailed information about each location"""
+    # TODO currently does not work
+    raise NotImplementedError
     loc_info = _session.get_loc_info()
     counter = 0
     for info in loc_info:
@@ -79,36 +86,32 @@ def show_loc_info(max_lines=1000):
 
 
 def eliminate_all():
+    """Eliminates all locations according to show_eliminable_locations(), in arbitrary order."""
     _session.eliminate_all()
 
 
 def eliminate(loc):
+    """Eliminates the given location (only works if eliminable)."""
     _session.eliminate(loc)
 
 
+def remove_unreachable_commands():
+    _session.remove_unreachable_commands()
+
+
 def show_eliminable_locations():
-    _session.show_eliminable_locations()
-
-
-def show_all_variables():
-    raise NotImplementedError
-
-
-def show_unfoldable_variables():
-    raise NotImplementedError
+    """Prints the currently eliminable locations with their estimated complexity scores."""
+    empty = True
+    for loc, score in _session.eliminable_locs():
+        print("{}, estimated compl.: {}".format(loc, score))
+        empty = False
+    if empty:
+        print("there are no eliminable locs")
 
 
 def unfold(var: str):
+    """Unfolds the specified variable."""
     _session.unfold(var)
-
-
-def eliminate_easy_self_loops():
-    raise NotImplementedError
-
-
-def try_eliminate_self_loops(loc=None):
-    # applies transition elimination once to each self loop, they may disappear by doing so
-    raise NotImplementedError
 
 
 def save_as_prism(path: str):

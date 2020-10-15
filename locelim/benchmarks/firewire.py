@@ -1,12 +1,10 @@
 from locelim.interactive import *
-from locelim.interactive.commands import session, show_model_constants, show_orig_model_info, set_property, load_model, \
-    def_model_constants, check_orig_model, show_pcfp_stats, show_eliminable_locations, unfold
 
 if __name__ == "__main__":
     # comment out to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-    load_model("originals/firewire_dl.prism")
+    load_model("models/firewire_dl.prism")
     #set_property('Pmin=? [ F (s1=8 & s2=7) | (s1=7 & s2=8) ]') # P>=1 [ F "done" ]
     set_property('Pmin=? [ F s=9 ]')  # for firewire_dl
 
@@ -36,4 +34,3 @@ if __name__ == "__main__":
     print(session().build_model())
     session().check_model()
     #show_as_prism()
-

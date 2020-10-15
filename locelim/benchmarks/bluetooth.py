@@ -2,26 +2,21 @@ from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
 from locelim.interactive import *
 
 
-# manual analysis/benchmarking of bluetooth
-
 def bluetooth(constant_defs=None):
     reset_session()
 
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    load_model("models/bluetooth.prism")
+    set_property("P=? [F (rec = mrec)]")
+    if constant_defs is None:
+        constant_defs = {'mrec': 1}
+    def_model_constants(constant_defs)
 
-    load_model("originals/bluetooth.prism")
-    set_property("P=? [ F 0=1 ]")
-    # if constant_defs is None:
-    #     constant_defs = {'mrec': 1}
-    # def_model_constants(constant_defs)
+    # TODO support building the model symbolically, this case study is quite big
+    model_orig, time_build_orig = session().build_orig_model(return_time=True)
+    res_orig, time_check_orig = session().check_orig_model(return_time=True)
+    states_orig = model_orig.nr_states
+    transitions_orig = model_orig.nr_transitions
 
-    # model_orig, time_build_orig = session().build_orig_model(return_time=True)
-    # res_orig, time_check_orig = session().check_orig_model(return_time=True)
-    # states_orig = model_orig.nr_states
-    # transitions_orig = model_orig.nr_transitions
-
-    show_as_prism()  # TODO beaks with SIGSEGV
 
     pcfp_stats = session().get_pcfp_stats()
     orig_locs = pcfp_stats["locations"]
@@ -31,17 +26,7 @@ def bluetooth(constant_defs=None):
     t_start = time.time()
 
     # actual simplification starts here
-    show_pcfp_stats()
-    #unfold("f1")
-    # unfold("t1")
-    # unfold("train1")
-    #unfold("freq1")
-
-    unfold("receiver")
-    unfold("send")
-    unfold("rec")
-
-    show_loc_info()
+    # TODO we cannot yet handle the init block
     # end of simplification
 
     t_end = time.time()
@@ -69,5 +54,6 @@ def bluetooth(constant_defs=None):
 
 
 if __name__ == "__main__":
-    benchmark_info = bluetooth()
-    print(to_latex_string(benchmark_info))
+    # comment out to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    bluetooth()

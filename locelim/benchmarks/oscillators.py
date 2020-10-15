@@ -1,11 +1,10 @@
 from locelim.interactive import *
 
 if __name__ == "__main__":
-
-    # comment out to disable logging
+    # uncomment to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-    load_model("originals/oscillators.6-6-0.1-1.prism")
+    load_model("models/oscillators.6-10-0.1-1.prism")
     #def_model_constants({"mu" :0.1, "lambda": 1})
 
 
@@ -49,16 +48,14 @@ if __name__ == "__main__":
     #eliminate_all()
     unfold("k_2")
     unfold("k_3")
-    #unfold("k_4")
+    unfold("k_4")
     #show_as_prism()
     # unfold("k_2")
     # unfold("k_3")
     #unfold("k_4")
     #unfold("k_5")
-    show_loc_info()
     #print(session()._pcfp.get_lucky_locs())
     show_eliminable_locations()
-    session()._pcfp.eliminate_nop_selfloops()
 
     model = session().build_model()
     print(model)

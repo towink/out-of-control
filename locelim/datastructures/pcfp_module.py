@@ -8,9 +8,8 @@ import networkx as nx
 
 from stormpy.utility import Z3SmtSolver, SmtCheckResult
 
+from locelim.datastructures.config import Config
 from locelim.datastructures.util import *
-from locelim.datastructures.update import AtomicUpdate, Assignment
-from locelim.datastructures import PCFPComposition
 
 
 class CmdNode:
@@ -51,17 +50,14 @@ class Location:
         goal_pred_loc_substituted = goal_predicate.substitute(self.val_map).simplify()
         if not goal_pred_loc_substituted.contains_variables():
             return goal_pred_loc_substituted.evaluate_as_bool()
-        # TODO this might be too crude
-        return True
-        # # there are
-        # solver = Z3SmtSolver(self.original_jani.expression_manager)
-        # solver.add(goal_pred_loc_substituted)
-        # solver.push()
-        # check_res = solver.check()
-        # if check_res == SmtCheckResult.Unsat:
-        #     return False
-        # else:
-        #     return True
+        solver = Z3SmtSolver(goal_predicate.manager)
+        solver.add(goal_pred_loc_substituted)
+        solver.push()
+        check_res = solver.check()
+        if check_res == SmtCheckResult.Unsat:
+            return False
+        else:
+            return True
 
     def to_prism_string(self, as_update=False):
         prime = ""
@@ -127,9 +123,6 @@ class PCFPModule:
 
     # private fields
 
-    # the set of location-guided commands, contain the locations
-    _commands: [Command] = []
-
     # lower/upper bound for bounded integer variables only
     int_variables_bounds: Dict[sp.Variable, Tuple[sp.Expression, sp.Expression]] = {}
 
@@ -139,51 +132,40 @@ class PCFPModule:
     # unique initial variable valuation for all variables
     initial_values: Dict[sp.Variable, sp.Expression] = {}
 
-    # initial locations
-    initial_locs: {object} = set()
-
-    # all undefined constants, may appear in variable bounds, guards, probabilities, updates
-    _undef_constants: [sp.Variable] = []
-    _undef_constants_types: Dict[sp.Variable, sp.ExpressionType] = []
-
+    # the PRISM module (not program) this PCFP module was created from
     _orig_prism_module: sp.PrismModule
-    _parent_composition: PCFPComposition
 
+    # the PCFP composition this module is part of
+    _parent_composition: object  # no typing here due to circular import of PCFPComposition
+
+    # underlying (multi)graph structure
     _graph: nx.MultiDiGraph
 
     # unique initial location, derived from initial values
-    _initial_loc: Location
+    _single_initial_loc: Location
 
-    # getters/setters
+    # configuration for algorithms to be used in this module
+    _config: Config
 
-    @property
-    def commands(self):
-        return self._commands
+    # precomputed constraint for int variable bounds
+    _dom_constraint: sp.Expression
+
+    # SMT solver for this module
+    _solver: Z3SmtSolver
 
     # constructors
 
     def __init__(self):
-        self._commands = []
         self.int_variables_bounds = {}
         self.boolean_variables = []
         self.initial_values = {}
-        self.initial_locs = set()
-        self._undef_constants = []
-        self._undef_constants_types = dict()
         self._orig_prism_module = None
         self._parent_composition = None
         self._graph = nx.MultiDiGraph()
-        self._initial_loc = None
-
-    def copy(self):
-        new_pcfp = PCFPModule()
-        new_pcfp._commands = list.copy(self._commands)
-        new_pcfp.int_variables_bounds = dict.copy(self.int_variables_bounds)
-        new_pcfp.initial_values = dict.copy(self.initial_values)
-        new_pcfp.initial_locs = set.copy(self.initial_locs)
-        new_pcfp._undef_constants = list.copy(self._undef_constants)
-        new_pcfp._undef_constants_types = dict.copy(self._undef_constants_types)
-        return new_pcfp
+        self._single_initial_loc = None
+        self._config = Config.default()
+        self._dom_constraint = None
+        self._solver = None
 
     def add_update(self, cmd_node: CmdNode, target_loc: Location, update: sp.PrismUpdate):
         # TODO check here if update is already there
@@ -194,6 +176,7 @@ class PCFPModule:
     def from_prism_module(cls, prism_module: sp.PrismModule):
         instance = PCFPModule()
         instance._orig_prism_module = prism_module
+        instance._config = Config.default()
 
         # local int variables of this module
         for int_var in prism_module.integer_variables:
@@ -202,6 +185,11 @@ class PCFPModule:
             instance.int_variables_bounds[int_var.expression_variable] = lower_upper
             # initial value
             instance.initial_values[int_var.expression_variable] = int_var.initial_value_expression
+
+        # precompute a constraint for the int variable domains
+        instance._dom_constraint = []
+        for constraint in instance._local_int_var_bounds_constraints():
+            instance._dom_constraint.append(constraint)
 
         # local bool variables of this module
         for bool_var in prism_module.boolean_variables:
@@ -213,7 +201,7 @@ class PCFPModule:
 
         # commands
         single_loc = Location()  # create single location without any valuation
-        instance._initial_loc = single_loc
+        instance._single_initial_loc = single_loc
         instance._graph.add_node(single_loc)
         for prism_cmd in prism_module.commands:
             # create a node belonging to the command (stores label/guard) and connect with loc
@@ -227,18 +215,20 @@ class PCFPModule:
 
     @property
     def name(self) -> str:
+        """Name of this module, as in the original PRISM file."""
         return self._orig_prism_module.name
 
     @property
     def expression_manager(self) -> sp.ExpressionManager:
         return self._parent_composition.expression_manager
 
-    def set_parent_composition(self, pcfp_composition: PCFPComposition):
-        self._parent_composition = pcfp_composition
+    def set_parent_composition(self, comp: object):
+        """Defines the composition this module is part of."""
+        self._parent_composition = comp
 
     @property
     def local_variables(self):
-        """Iterates of the local variables of this module"""
+        """Iterates of the local variables of this module."""
         for int_var in self.int_variables_bounds.keys():
             yield int_var
         for bool_var in self.boolean_variables:
@@ -248,11 +238,27 @@ class PCFPModule:
         return var in self.local_variables
 
     @property
+    def is_single_module_in_composition(self) -> bool:
+        """Returns True iff this module is the only one in its composition."""
+        return self._parent_composition.has_single_module
+
+    def is_loc_possibly_initial(self, loc: Location):
+        if self._single_initial_loc is not None:
+            return loc == self._single_initial_loc
+        raise Exception("no initial loc set")
+
+    @property
     def locations(self) -> Generator[Location]:
-        """Iterate over locations"""
+        """Iterates over all locations in this PCFP."""
         return (node for node in self._graph.nodes if isinstance(node, Location))
 
+    @property
+    def cmd_nodes(self) -> Generator[CmdNode]:
+        """Iterate over command nodes."""
+        return (node for node in self._graph.nodes if isinstance(node, CmdNode))
+
     def get_commands(self) -> Generator[Command]:
+        """Iterates over commands."""
         for node in self._graph.nodes:
             if isinstance(node, CmdNode):
                 source_loc = next(self._graph.predecessors(node))
@@ -263,7 +269,21 @@ class PCFPModule:
 
     @property
     def nr_locations(self) -> int:
+        """Returns the total number of locations in this PCFP module."""
         return sum(1 for _ in self.locations)
+
+    @property
+    def nr_commands(self) -> int:
+        """Returns the total number of commands in this PCFP module."""
+        return sum(1 for _ in self.cmd_nodes)
+
+    @property
+    def nr_transitions(self) -> int:
+        """Returns the total number of transitions in this PCFP module."""
+        return sum(self._graph.out_degree(cmd_node) for cmd_node in self.cmd_nodes)
+
+    def set_config(self, config: Config):
+        self._config = config
 
     def get_values_for_local_var(self, var: sp.Variable) -> Generator[sp.Expression]:
         """Generator over possible values for the given local variable"""
@@ -282,10 +302,16 @@ class PCFPModule:
         else:
             raise Exception("only int or boolean variables are supported")
 
+    def remove_all_action_labels(self):
+        """Removes all action labels from all commands."""
+        for cmd_node in self.cmd_nodes:
+            cmd_node.action_label = ""
+
     def remove_unreachable_locs(self):
+        """Make BFS in the graph and only keep the reachable fragment."""
         nr_locs_before = self.nr_locations
         new_graph = nx.MultiDiGraph()
-        for u, v, key in nx.edge_bfs(self._graph, source=self._initial_loc, orientation=None):
+        for u, v, key in nx.edge_bfs(self._graph, source=self._single_initial_loc, orientation=None):
             if 'update' in self._graph[u][v][key]:
                 new_graph.add_edge(u, v, update=self._graph[u][v][key]['update'])
             else:
@@ -294,30 +320,65 @@ class PCFPModule:
         nr_locs_after = self.nr_locations
         logging.info("{} unreachable locations were removed".format(nr_locs_before - nr_locs_after))
 
+    def remove_unreachable_commands(self):
+        if not self.is_single_module_in_composition:
+            logging.warning("remove_unreachable_commands might not be sound in compositions")
+        counter = 0
+        for cmd_node in frozenset(self.cmd_nodes):
+            source_loc = next(self._graph.predecessors(cmd_node))
+            if self.is_loc_possibly_initial(source_loc):
+                continue
+            constraint = self.expression_manager.create_boolean(False)
+            for prev_cmd_node, _, update in self._graph.in_edges(source_loc, data='update'):
+                if prev_cmd_node is cmd_node:
+                    continue
+                wp = cmd_node.guard.substitute(update.get_as_variable_to_expression_map()).simplify()
+                condition = sp.Expression.And(prev_cmd_node.guard, wp).simplify()
+                if condition.contains_variables():
+                    constraint = sp.Expression.Or(constraint, condition)
+            if not constraint.contains_variables() and constraint.evaluate_as_bool() is False:
+                continue
+            solver = Z3SmtSolver(self.expression_manager)
+            solver.add(constraint)
+            for bound in self._local_int_var_bounds_constraints():
+                solver.add(bound)
+            solver.push()
+            if solver.check() == SmtCheckResult.Unsat:
+                logging.debug("unsat: {}".format(constraint))
+                logging.debug("removing command with source loc {}".format(source_loc))
+                self._graph.remove_node(cmd_node)
+                counter += 1
+        # todo iterate further?
+        logging.info(f"{counter} unreachable commands were removed")
+
+    def _substitute_and_remove_const_lhs(self, var, update: sp.PrismUpdate, substitution) -> (sp.PrismUpdate, object):
+        # returns u[v] and u(v)(x) in paper notation
+        update_subst = update.substitute(substitution).simplify()
+        # the value u(v)(x)
+        if var in update_subst.get_as_variable_to_expression_map():
+            new_target_loc_val = update_subst.get_assignment(var.name).expression
+        else:
+            new_target_loc_val = substitution[var]
+        new_asgs = []
+        # only keep assignments whose lhs variable is not substituted
+        for asg in update_subst.assignments:
+            if asg.variable in substitution:
+                continue
+            new_asgs.append(asg)
+        new_update = sp.PrismUpdate(update.global_index, update.probability_expression, new_asgs)
+        return new_update, new_target_loc_val
+
     def unfold(self, var: sp.Variable):
         """Unfolds the given variable into the location space"""
         if not self.has_local_variable(var):
             raise Exception("Variable {} is no local variable in module {}".format(var.name, self.name))
+
+        logging.info(f"unfolding {var}...")
+        t_start = time.time()
+
         # TODO check unfoldable (is done further below)?
         # if not self.is_unfoldable(var):
         #    raise Exception("The variable cannot be unfolded")
-
-        # the returns u[v] and u(v)(x) in paper notation
-        def substitute_and_remove_const_lhs(udpate: sp.PrismUpdate, substitution) -> (sp.PrismUpdate, object):
-            update_subst = update.substitute(substitution).simplify()
-            # the value u(v)(x)
-            if var in update_subst.get_as_variable_to_expression_map():
-                new_target_loc_val = update_subst.get_assignment(var.name).expression
-            else:
-                new_target_loc_val = substitution[var]
-            new_asgs = []
-            # only keep assignments whose lhs variable is not substituted
-            for asg in update_subst.assignments:
-                if asg.variable in substitution:
-                    continue
-                new_asgs.append(asg)
-            new_update = sp.PrismUpdate(update.global_index, update.probability_expression, new_asgs)
-            return new_update, new_target_loc_val
 
         new_graph = nx.MultiDiGraph()
 
@@ -329,7 +390,7 @@ class PCFPModule:
                 new_loc = loc.extend(substitution)
                 if new_loc.is_initial(self.initial_values):
                     logging.debug("initial location was set to {}".format(new_loc))
-                    self._initial_loc = new_loc
+                    self._single_initial_loc = new_loc
                 for cmd_node in self._graph.successors(loc):
                     new_guard = cmd_node.guard.substitute(substitution).simplify()
                     # if the guard has evaluated to false then ignore the whole command
@@ -341,7 +402,8 @@ class PCFPModule:
                     # process each update of the command
                     for _, target_loc, update in self._graph.out_edges(cmd_node, data="update"):
                         # this also substitutes the probability expression in the update
-                        new_update, new_target_loc_val = substitute_and_remove_const_lhs(update, substitution)
+                        new_update, new_target_loc_val = self._substitute_and_remove_const_lhs(var, update,
+                                                                                               substitution)
                         new_target_loc = target_loc.extend({var: new_target_loc_val})
                         if new_target_loc_val.contains_variables():
                             logging.error(f"variable {var.name} was not unfoldable")
@@ -349,10 +411,17 @@ class PCFPModule:
 
         self._graph = new_graph
         self.remove_unreachable_locs()
-        logging.info("finished unfolding, there are now {} locations in {}".format(self.nr_locations, self.name))
+        if self.is_single_module_in_composition:
+            if self._config.remove_unreachable_commands:
+                self.remove_unreachable_commands()
+                self.remove_unreachable_locs()
+        t_end = time.time()
+        logging.info("finished unfolding (took {:.3}s) there are now {} locations in {}".format(t_end - t_start,
+                                                                                                self.nr_locations,
+                                                                                                self.name))
 
-    # converts this PCFP to a PRISM program as string
     def to_prism_string(self) -> str:
+        """Converts this PCFP to a PRISM program as string."""
         res = ""
 
         res += "module {}\n".format(self.name)
@@ -370,9 +439,10 @@ class PCFPModule:
         res += "endmodule\n"
         return res
 
-    # public functions
-
     def is_unfoldable(self, var: sp.Variable):
+        """Determines if the given variable is (directly) unfoldable."""
+        # TODO currently does not work
+        raise NotImplementedError()
         for cmd in self._commands:
             for dest in cmd.destinations:
                 subst_map = dest.update.to_subst_map()
@@ -391,55 +461,94 @@ class PCFPModule:
             yield sp.Expression.Geq(var.get_expression(), lower)
             yield sp.Expression.Leq(var.get_expression(), upper)
 
+    @property
+    def solver(self):
+        if self._solver is None:
+            self._solver = Z3SmtSolver(self.expression_manager)
+        return self._solver
+
     def _is_surely_unsat(self, exp: sp.Expression) -> bool:
         # use SMT solver to check expression with this module's variable bounds
-        solver = Z3SmtSolver(self.expression_manager)
-        solver.add(exp)
-        for constraint in self._local_int_var_bounds_constraints():
-            solver.add(constraint)
-        for constant in self._parent_composition.undef_constants:
-            if constant.type.is_integer:
-                # constants must be non-negative
-                solver.add(
-                    sp.Expression.Geq(
-                        self.expression_manager.get_variable(constant.name).get_expression(),
-                        self.expression_manager.create_integer(0)
-                    )
-                )
-        solver.push()
-        if solver.check() == SmtCheckResult.Unsat:
+        # TODO this is often very time consuming (found with profiler)
+        if not exp.contains_variables() and exp.evaluate_as_bool() is False:
+            return True
+        self.solver.reset()
+        for constr in self._dom_constraint:
+            self._solver.add(constr)
+        self.solver.add(exp)
+        self.solver.push()
+        if self.solver.check() == SmtCheckResult.Unsat:
             return True
         else:
             return False
 
-    def eliminate_transition(self, cmd_node: CmdNode, target_loc: Location, key: int):
+    def _trans_multiplicity(self, cmd_node: CmdNode, target_loc: Location) -> int:
+        # Multiplicity of the specified transition, its exact key is not important.
+        return self._graph.number_of_edges(cmd_node, target_loc)
+
+    def estimate_elimination_complexity_of_trans(self, cmd_node: CmdNode, target_loc: Location):
+        """A score indicating the expected complexity of applying transition elimination to the given transition.
+
+        Is roughly the number of new transitions to be created.
+        """
+        # m = self._trans_multiplicity(cmd_node, target_loc)
+        n = self._graph.out_degree(cmd_node) - 1
+        m = self._graph.out_degree(target_loc)
+        nr_dest_of_target = 0
+        for next_cmd_node in self._graph.successors(target_loc):
+            nr_dest_of_target += self._graph.out_degree(next_cmd_node)
+        return (m - 1) * n + nr_dest_of_target - 1
+
+    def estimate_elimination_complexity_of_loc(self, loc: Location):
+        """A score indicating the expected complexity of applying transition elimination to the given transition.
+
+        Is roughly the number of new transitions to be created.
+        """
+        score = 0
+        for cmd_node in self._graph.predecessors(loc):
+            mult = self._trans_multiplicity(cmd_node, loc)
+            # TODO this is still a rather rough estimate
+            score += 2 ** mult * self.estimate_elimination_complexity_of_trans(cmd_node, loc)
+        return score
+
+    def eliminate_transition(self, cmd_node: CmdNode, target_loc: Location, key: int, keep_old_transition=False):
+        """Eliminates the transition between cmd_node and target_loc, uniquely identified by the key of its edge"""
+
+        logging.debug(
+            "eliminating a transition of multiplicity {}...".format(self._trans_multiplicity(cmd_node, target_loc)))
 
         def wp(update: sp.PrismUpdate, post_cond: sp.Expression) -> sp.Expression:
             return post_cond.substitute(update.get_as_variable_to_expression_map()).simplify()
 
         # sequences two updates
+        # todo this code is horrible
         def seq(update_left, update_right):
-            map_right_subst = update_right.substitute(update_left.get_as_variable_to_expression_map()).get_as_variable_to_expression_map()
+            map_right_subst = update_right.substitute(
+                update_left.get_as_variable_to_expression_map()).get_as_variable_to_expression_map()
             map_left = update_left.get_as_variable_to_expression_map()
             for key, val in map_right_subst.items():
                 map_left[key] = val  # overwrite
             new_asgs = []
             for key, val in map_left.items():
                 new_asgs.append(sp.PrismAssignment(key, val))
-            new_probability = sp.Expression.Multiply(update_left.probability_expression, update_right.probability_expression).simplify()
+            new_probability = sp.Expression.Multiply(update_left.probability_expression,
+                                                     update_right.probability_expression.substitute(
+                                                         update_left.get_as_variable_to_expression_map())
+                                                     ).simplify()
             new_update = sp.PrismUpdate(update_right.global_index, new_probability, new_asgs)
             return new_update
 
         update = self._graph[cmd_node][target_loc][key]['update']
         label = cmd_node.action_label
         guard = cmd_node.guard
-        prob = update.probability_expression
-        source_loc = next(self._graph.predecessors(cmd_node))
+        source_loc = next(self._graph.predecessors(cmd_node))  # cmd_node has exactly 1 predecessor
 
         succs = frozenset(self._graph.successors(target_loc))
         for next_cmd_node in succs:
             next_guard = next_cmd_node.guard
             next_label = next_cmd_node.action_label
+            if self._config.elim_must_not_add_new_labels:
+                assert label == "" or next_label == ""
             new_label = "_".join(lab for lab in [label, next_label] if lab != '')
             new_guard = sp.Expression.And(guard, wp(update, next_guard)).simplify()
 
@@ -451,39 +560,43 @@ class PCFPModule:
             new_cmd_node = CmdNode(new_label, new_guard)
             self._graph.add_edge(source_loc, new_cmd_node)
 
-            for _, other_target_loc, other_key, other_update in self._graph.out_edges(cmd_node, data='update', keys=True):
+            for _, other_target_loc, other_key, other_update in self._graph.out_edges(cmd_node, data='update',
+                                                                                      keys=True):
                 self._graph.add_edge(new_cmd_node, other_target_loc, update=other_update, key=other_key)
 
             self._graph.remove_edge(new_cmd_node, target_loc, key)
-
 
             for _, next_target_loc, next_update in self._graph.out_edges(next_cmd_node, data='update'):
                 new_update = seq(update, next_update)
                 self._graph.add_edge(new_cmd_node, next_target_loc, update=new_update)
 
         # finally eliminate node cmd_node from the graph
-        self._graph.remove_node(cmd_node)
+        if not keep_old_transition:
+            self._graph.remove_node(cmd_node)
 
-    # if loc has no self-loops then it will be unreachable after applying this function
     def eliminate_loc(self, loc: Location):
-        logging.info("eliminating {}...".format(loc))
+        """If loc has no self-loops then it will be unreachable after applying this function."""
+        logging.info("eliminating {} with score {}... ".format(loc, self.estimate_elimination_complexity_of_loc(loc)))
         t_start = time.time()
 
-        # not sure why I had to use iter here ...
+        # not sure why I have to use iter here ...
         to_eliminate = next(iter(self._graph.in_edges(loc, keys=True)), None)  # tuples u,v,k or None
         while to_eliminate:
             cmd_node = to_eliminate[0]
             # loc = to_eliminate[1], same as input loc
             key = to_eliminate[2]
-            #logging.debug("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
+            # logging.debug("eliminate transition {} ---{}---> {}".format(cmd.source_loc, cmd.guard, dest))
             self.eliminate_transition(cmd_node, loc, key)
             to_eliminate = next(iter(self._graph.in_edges(loc, keys=True)), None)
 
         self.remove_unreachable_locs()
         t_end = time.time()
-        logging.info("...elimination took {}s".format(t_end - t_start))
+        logging.info("...elimination took {:.3f}s".format(t_end - t_start))
 
     def remove_duplicate_cmds(self):
+        """Attempts to remove duplicated commands."""
+        # TODO currently does not work
+        raise NotImplementedError()
         dupls = len(self._commands) * [False]
         for i in range(len(self._commands)):
             if dupls[i]:
@@ -502,6 +615,9 @@ class PCFPModule:
         logging.info("removed {} duplicate commands".format(removed))
 
     def eliminate_nop_selfloops(self):
+        """Eliminates nop self-loops with p<1."""
+        # TODO currently does not work
+        raise NotImplementedError()
         counter = 0  # count how many are eliminated
         for cmd in self._commands:
             selfloops = cmd.get_nop_selfloops()
@@ -522,82 +638,8 @@ class PCFPModule:
     def get_upper_bound(self, var: sp.Variable) -> sp.Expression:
         return self.int_variables_bounds[var][1]
 
-    def count_destinations(self):
-        return sum([cmd.count_destinations() for cmd in self._commands])
-
-    def eliminate_unsatisfiable_commands(self):
-        counter = 0
-        for loc in self.get_locs():
-            if self.is_loc_possibly_initial(loc):
-                continue
-
-            incoming_dests = self.get_destinations_with_target(loc)
-            outgoing_commands = self.get_commands_with_source(loc)
-
-            for outgoing in outgoing_commands:
-                outgoing: Command
-                reachable = False
-                for (cmd, dest) in incoming_dests:
-                    cmd: Command
-                    dest: Command.Destination
-                    wp_out = dest.update.wp(outgoing.guard)
-                    total_guard: sp.Expression = sp.Expression.And(cmd.guard, wp_out)
-
-                    if not total_guard.contains_variables():
-                        if total_guard.evaluate_as_bool():
-                            reachable = True
-                            break
-                        else:
-                            continue
-
-                    solver = Z3SmtSolver(total_guard.manager)
-                    solver.add(total_guard)
-                    for var in total_guard.get_variables():
-                        var: sp.Variable
-                        if var in self._undef_constants or not var in self.int_variables_bounds:
-                            continue
-                        solver.add(sp.Expression.Geq(var.get_expression(), self.get_lower_bound(var)))
-                        solver.add(sp.Expression.Leq(var.get_expression(), self.get_upper_bound(var)))
-                    solver.push()
-                    if solver.check() != SmtCheckResult.Unsat:
-                        reachable = True
-                        break
-                if not reachable:
-                    self.commands.remove(outgoing)
-                    counter += 1
-        logging.info("removed {} unsatisfiable commands".format(counter))
-
-    def get_initial_location(self):
-        locs = self.get_locs()
-        for loc in locs:
-            is_initial = True
-            for var in loc:
-                loc_val: sp.Expression = loc[var]
-                init_val: sp.Expression = self.initial_values[var]
-                eq = sp.Expression.Eq(loc_val, init_val)
-                if not eq.evaluate_as_bool():
-                    is_initial = False
-                    break
-            if is_initial:
-                return loc
-        raise Exception("Could not find initial location. Perhaps it was eliminated?")
-
-    def get_locs_without_selfloops(self):
-        return [loc for loc in self.get_locs() if
-                all(map(lambda cmd: not cmd.has_selfloop(), self.get_commands_with_source(loc)))]
-
-    def is_loc_potential_goal(self, loc, goal_predicate):
-        goal_pred_loc_substituted = goal_predicate.substitute(loc).simplify()
-        solver = Z3SmtSolver(self.original_jani.expression_manager)
-        solver.add(goal_pred_loc_substituted)
-        solver.push()
-        check_res = solver.check()
-        if check_res == SmtCheckResult.Unsat:
-            return False
-        else:
-            return True
-
     def has_loc_selfloop(self, loc: Location):
+        """Determines if the given location has a self-loop."""
         for cmd_node in self._graph.successors(loc):
             if loc in self._graph.successors(cmd_node):
                 return True
@@ -606,85 +648,11 @@ class PCFPModule:
     def eliminable_locs(self, goal_predicate: sp.Expression) -> Generator[Location]:
         """Iterate over all locations that have no self loops, are not initial nor potential goals."""
         for loc in self.locations:
-            if loc is not self._initial_loc and not loc.is_potential_goal(goal_predicate):
+            if loc is not self._single_initial_loc and not loc.is_potential_goal(goal_predicate):
                 if not self.has_loc_selfloop(loc):
-                    yield loc
-
-    def is_loc_sink_without_target(self, loc, goal_predicate):
-        # all outgoing transitions are self loops and loc is no potential goal
-        if self.is_loc_potential_goal(loc, goal_predicate):
-            return False
-        for cmd in self.get_commands_with_source(loc):
-            # if some command at loc has a non self-loop transition then loc is no sink
-            if not cmd.has_only_selfloops():
-                return False
-        return True
-
-    def get_sink_locs_without_targets(self, goal_predicate):
-        return [loc for loc in self.get_locs() if self.is_loc_sink_without_target(loc, goal_predicate)]
-
-    def is_loc_lucky(self, loc):
-        # loc is lucky if it does have self-loops but can be eliminated anyway (by eliminate(loc))
-        cmds = self.get_commands_with_source(loc)
-        selfloops = [cmd for cmd in cmds if cmd.has_selfloop()]
-        if not selfloops:
-            # if the location has no self loop at all then don't consider it
-            return False
-        ingoing = [(cmd, dest) for (cmd, dest) in self.get_destinations_with_target(loc)
-                   if not are_locs_equal(cmd.source_loc, loc)]
-        solver = Z3SmtSolver(self.get_manager())
-        for cmd, dest in ingoing:
-            for loop in selfloops:
-                solver.reset()
-                query = sp.Expression.And(cmd.guard, dest.update.wp(loop.guard))
-                solver.add(query)
-                solver.push()
-                check_res = solver.check()
-                if check_res != SmtCheckResult.Unsat:
-                    # if some combination of self loop and ingoing transition is sat then we are not lucky
-                    return False
-        return True
-
-    def get_lucky_locs(self):
-        result = []
-        for loc in self.get_locs():
-            if self.is_loc_lucky(loc):
-                result.append(loc)
-        return result
-
-    def get_commands_without_selfloops(self):
-        return [cmd for cmd in self._commands if not cmd.has_selfloop()]
-
-    def get_commands_with_source(self, source_loc):
-        return list(filter(
-            lambda cmd: are_locs_equal(source_loc, cmd.source_loc),
-            self._commands
-        ))
-
-    def get_commands_with_target(self, target_loc):
-        result = []
-        for cmd in self._commands:
-            for dest in cmd.destinations:
-                if are_locs_equal(dest.target_loc, target_loc):
-                    result.append(cmd)
-                    break
-        return result
-
-    def get_destinations_with_target(self, target_loc, include_selfloops=True):
-        result = []
-        for cmd in self._commands:
-            if not include_selfloops and are_locs_equal(cmd.source_loc, target_loc):
-                continue
-            result += [(cmd, dest) for dest in cmd.destinations if are_locs_equal(dest.target_loc, target_loc)]
-        return result
-
-    def estimate_elim_complexity_for_loc(self, loc):
-        # an estimate for how complex eliminating the given loc would be
-        return len(self.get_destinations_with_target(loc)) * len(self.get_commands_with_source(loc))
-
-    def get_commands_with_nop_selfloop(self):
-        return [cmd for cmd in self._commands if cmd.has_nop_selfloop() and len(cmd.destinations) > 1]
-
-    def has_removable_nop_selfloops(self):
-        # removable means that it is not the self loop on the sink
-        raise NotImplementedError
+                    if self._config.elim_must_not_add_new_labels:
+                        if all(cmd_node.action_label == "" for cmd_node in self._graph.successors(loc)) or all(
+                                cmd_node.action_label == "" for cmd_node in self._graph.predecessors(loc)):
+                            yield loc
+                    else:
+                        yield loc

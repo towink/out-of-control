@@ -1,44 +1,13 @@
+from locelim.benchmarks.benchmark_utils import stat_vars
 from locelim.interactive import *
 
-if __name__ == "__main__":
-
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    load_model("originals/coin_game.prism")
-    show_model_constants()
-    set_property("P=? [ F x>=N ]")
-    def_model_constants({'N': 1000})
-
-    res_orig = check_orig_model()
-    show_orig_model_info()
-
-    unfold("f")
-    show_eliminable_locations()
-    show_loc_info()
-    eliminate({"f": True})  # this locatino is lucky so eliminate it
-    show_pcfp_stats()
-    show_as_prism()
-
-    model = session().build_model()
-    session().check_model()
-    print(model)
-
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
-from locelim.interactive import *
-
-
-# manual analysis/benchmarking of the coin game from the paper
 
 def coin_game(constant_defs=None):
     reset_session()
 
-    # comment out to disable logging
-    # logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    load_model("originals/coin_game.prism")
+    load_model("models/coin_game.prism")
     show_model_constants()
-    set_property("P=? [ F x>=N ]")
+    set_property("P=? [ F x>=N & !f ]")
     if constant_defs is None:
         constant_defs = {'N': 1000}
     def_model_constants(constant_defs)
@@ -55,12 +24,11 @@ def coin_game(constant_defs=None):
 
     t_start = time.time()
 
-    # actual simplification starts here
-    session().unfold("f")
-    session().eliminate({"f": True})  # this location is lucky so eliminate it
-    #session().eliminate_unsatisfiable_commands()
-    #session().eliminate_all()
-    # end of simplificaiton
+    # start of simplification
+    unfold("f")
+    remove_unreachable_commands()
+    eliminate_all()
+    # end of simplification
 
     t_end = time.time()
     time_simplification = t_end - t_start
@@ -87,5 +55,6 @@ def coin_game(constant_defs=None):
 
 
 if __name__ == "__main__":
-    benchmark_info = coin_game()
-    print(to_latex_string(benchmark_info))
+    # uncomment to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    coin_game()

@@ -1,16 +1,11 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from locelim.benchmarks.benchmark_utils import stat_vars
 from locelim.interactive import *
 
-
-# manual analysis/benchmarking of leader_sync
 
 def leader_sync():
     reset_session()
 
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    load_model("originals/leader_sync.4-8.prism")
+    load_model("models/leader_sync.4-8.prism")
     # P>=1 [ F "elected" ]
     # set_property("P=? [ F s1=3&s2=3&s3=3 ]")  # for 3-x
     set_property("P=? [ F s1=3&s2=3&s3=3&s4=3 ]")  # for 4-x
@@ -30,7 +25,8 @@ def leader_sync():
 
     t_start = time.time()
 
-    # actual simplification starts here
+    # start of simplification
+    flatten()
     unfold("s1")
     eliminate_all()
     unfold("c")
@@ -62,5 +58,6 @@ def leader_sync():
 
 
 if __name__ == "__main__":
-    benchmark_info = leader_sync()
-    print(to_latex_string(benchmark_info))
+    # uncomment to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    leader_sync()

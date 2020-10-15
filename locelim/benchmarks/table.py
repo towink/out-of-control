@@ -1,4 +1,4 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string, NA_latex_string
+from locelim.benchmarks.benchmark_utils import to_latex_string
 from locelim.benchmarks.brp import brp
 from locelim.benchmarks.coin_game import coin_game
 from locelim.benchmarks.coupon import coupon
@@ -8,15 +8,12 @@ from locelim.benchmarks.leader_sync import leader_sync
 from locelim.benchmarks.nand import nand
 
 
-def make_latex_table():
+def make_latex_table_tacas_21_submission():
     res = ""
 
-    # benchmark_info = bluetooth()
-    res += NA_latex_string("bluetooth")
-
-    benchmark_info = brp({"N": 2048, "MAX": 10})
+    benchmark_info = brp({"N": 2**11, "MAX": 10})
     res += to_latex_string(benchmark_info)
-    benchmark_info = brp({"N": 4096, "MAX": 20})
+    benchmark_info = brp({"N": 2**12, "MAX": 20})
     res += to_latex_string(benchmark_info)
 
     benchmark_info = coupon()
@@ -38,10 +35,6 @@ def make_latex_table():
     benchmark_info = nand({"N": 60, "K": 2})
     res += to_latex_string(benchmark_info)
 
-    # benchmark_info = oscillators()
-    res += NA_latex_string("oscillators")
-
-
     res += "\\hline\n"
 
     benchmark_info = coin_game({"N": 10000})
@@ -50,5 +43,5 @@ def make_latex_table():
     return res
 
 if __name__ == "__main__":
-    table = make_latex_table()
+    table = make_latex_table_tacas_21_submission()
     print(table)

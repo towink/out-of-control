@@ -1,17 +1,13 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from locelim.benchmarks.benchmark_utils import stat_vars
 from locelim.interactive import *
 
-
-# manual analysis/benchmarking of egl
 
 def egl(constant_defs=None):
     reset_session()
 
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    load_model("originals/egl.prism")
-    L = 5
+    load_model("models/egl.prism")
+    # TODO labels in properties not yet supported, so here's a workaround
+    L = 2
     kB = f"( (a0={L}  & a20={L})\
     			 | (a1={L}  & a21={L})\
     			 | (a2={L}  & a22={L})\
@@ -54,7 +50,7 @@ def egl(constant_defs=None):
     			 | (b19={L} & b39={L}))"
     set_property('P=? [ F (!{} & {} & phase=4)  ]'.format(kA, kB))
     if constant_defs is None:
-        constant_defs = {'N': 5, 'L': 4}
+        constant_defs = {'N': 5, 'L': L}
     def_model_constants(constant_defs)
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
@@ -69,10 +65,12 @@ def egl(constant_defs=None):
 
     t_start = time.time()
 
-    # actual simplification starts here
+    # start of simplification
+    flatten()
     unfold("phase")
     unfold("party")
     eliminate_all()
+    # end of simplification
 
     t_end = time.time()
     time_simplification = t_end - t_start
@@ -99,5 +97,6 @@ def egl(constant_defs=None):
 
 
 if __name__ == "__main__":
-    benchmark_info = egl()
-    print(to_latex_string(benchmark_info))
+    # uncomment to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    egl()

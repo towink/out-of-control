@@ -6,9 +6,9 @@ if __name__ == "__main__":
     # comment out to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
-    #session().load_composition("originals/consensus.2.prism")
+    #session().load_composition("models/consensus.2.prism")
 
-    session().load_model("originals/consensus.2.manual.prism")
+    session().load_model("models/consensus.2.prism")
     print(session().get_model_constants())
     session().def_model_constant('K', 2)
     session().set_property("Pmin=? [ F pc1=3 & pc2=3 & coin1=1 & coin2=1]")
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     print(session().check_model())
 
 
-    # prism_model = sp.parse_prism_program("originals/consensus.2.prism")
+    # prism_model = sp.parse_prism_program("models/consensus.2.prism")
     # comp = PCFPComposition.from_prism(prism_model)
     # mgr: sp.ExpressionManager = comp.expression_manager
     # proc1 = comp.get_module_by_name("process1")
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # print(list(proc1.eliminable_locs("pc1=3 & pc2=3 & coin1=1 & coin2=1")))
     #
     #
-    # load_model("originals/consensus.2.prism")
+    # load_model("models/consensus.2.prism")
     # show_model_constants()
     # def_model_constant('K', 10)
     # show_orig_model_info()

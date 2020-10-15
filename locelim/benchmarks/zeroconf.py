@@ -5,10 +5,7 @@ from locelim.interactive import *
 def zeroconf():
     reset_session()
 
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    load_model("originals/zeroconf.v1.prism")
+    load_model("models/zeroconf.v1.prism")
     show_model_constants()
     set_property("Pmax=? [ F (l=4 & ip=1) ]")
     constant_defs = {"N": 20, "K": 2, "reset": False}
@@ -26,31 +23,12 @@ def zeroconf():
 
     t_start = time.time()
 
-    # actual simplification starts here
-    unfold("l")
-    show_eliminable_locations()
-    eliminate_all()
-
-    unfold("mess")
-    unfold("b")
-    show_eliminable_locations()
-    eliminate_all()
-
-    unfold("z")
-    session().eliminate_unsatisfiable_commands()
-    show_eliminable_locations()
-    eliminate_all()
-
-    unfold("ip")
-    session().eliminate_unsatisfiable_commands()
-    show_eliminable_locations()
-    eliminate_all()
-    show_loc_info()
+    # start of simplification
+    # TODO
+    # end of simplification
 
     t_end = time.time()
     time_simplification = t_end - t_start
-
-    #session().show_as_prism()
 
     model_simpl, time_build_simpl = session().build_model(return_time=True)
     res_simpl, time_check_simpl = session().check_model(return_time=True)
@@ -69,7 +47,7 @@ def zeroconf():
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'brp'
+    benchmark_info['name'] = 'zeroconf'
     benchmark_info['constant_defs'] = constant_defs
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
@@ -78,5 +56,4 @@ def zeroconf():
 
 
 if __name__ == "__main__":
-    benchmark_info = zeroconf()
-    print(to_latex_string(benchmark_info))
+    zeroconf()

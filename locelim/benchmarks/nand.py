@@ -1,20 +1,15 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from locelim.benchmarks.benchmark_utils import stat_vars
 from locelim.interactive import *
 
-
-# manual analysis/benchmarking of nand
 
 def nand(constant_defs=None):
     reset_session()
 
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    load_model("originals/nand.prism")
+    load_model("models/nand.prism")
     show_model_constants()
     set_property("P=? [ F s=4 & z/N<0.1 ]")
     if constant_defs is None:
-        constant_defs = {'N': 10, 'K': 4}
+        constant_defs = {'N': 10, 'K': 20}
     def_model_constants(constant_defs)
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
@@ -29,11 +24,10 @@ def nand(constant_defs=None):
 
     t_start = time.time()
 
-    # actual simplification starts here
-    session().unfold("s")
-    session().eliminate({"s": 2})
-    session().eliminate({"s": 3})
-    session().eliminate({"s": 1})
+    # start of simplification
+    unfold("s")
+    eliminate_all()
+    # end of simplification
 
     t_end = time.time()
     time_simplification = t_end - t_start
@@ -60,5 +54,6 @@ def nand(constant_defs=None):
 
 
 if __name__ == "__main__":
-    benchmark_info = nand()
-    print(to_latex_string(benchmark_info))
+    # uncomment to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    nand()

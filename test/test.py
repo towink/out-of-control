@@ -3,8 +3,6 @@ from locelim.interactive import *
 
 # this file contains automated tests
 
-from locelim.interactive.commands import reset_session, session
-
 
 def assert_results_close(res_orig, res_other, epsilon=0.0001):
     if abs(res_orig - res_other) > epsilon:
@@ -12,7 +10,7 @@ def assert_results_close(res_orig, res_other, epsilon=0.0001):
 
 
 if __name__ == '__main__':
-    models_folder = "../locelim/benchmarks/originals/"
+    models_folder = "../locelim/benchmarks/models/"
 
     # --- test with nand ---
 
@@ -54,6 +52,8 @@ if __name__ == '__main__':
     set_property("P=? [ F s=5 & srep=2 ]")
 
     result_orig = session().check_orig_model()
+
+    flatten()  # brp contains several modules
 
     unfold("r")
     result_simplified = session().check_model()

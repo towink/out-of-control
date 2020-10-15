@@ -1,21 +1,18 @@
 from locelim.interactive import *
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from locelim.benchmarks.benchmark_utils import stat_vars
 
 
 def coupon(constant_defs=None):
     reset_session()
 
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    #load_model("originals/coupon_count.10-1.prism")
-    load_model("originals/coupon.10-1.prism")
+    load_model("models/coupon.10-1.prism")
+    # load_model("models/coupon_count.10-1.prism")
     if constant_defs is None:
-        #constant_defs = {"N": 10}
         constant_defs = {}
+        # constant_defs = {"N": 20}
     def_model_constants(constant_defs)
     set_property("P=? [ F c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9 & s=2]")
-    #set_property("P=? [ F c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9 & s=2 & c=N]")
+    # set_property("P=? [ F c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9 & s=2 & c=N]")
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
@@ -29,13 +26,11 @@ def coupon(constant_defs=None):
 
     t_start = time.time()
 
-    # actual simplification starts here
-    session().unfold("s")
-    eliminate({"s": 1})
+    # start of simplification
+    unfold("s")
+    eliminate_all()
     unfold("draw")
     eliminate_all()
-    #unfold("c0")
-    #eliminate_all()
     # end of simplification
 
     t_end = time.time()
@@ -66,5 +61,6 @@ def coupon(constant_defs=None):
 
 
 if __name__ == "__main__":
-    benchmark_info = coupon()
-    print(to_latex_string(benchmark_info))
+    # uncomment to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    coupon()

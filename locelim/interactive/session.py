@@ -1,16 +1,17 @@
 import logging
+import os
 import time
 from typing import Dict, Generator
 
 import stormpy as sp
 
-from locelim.datastructures.PCFP import PCFP
-from locelim.datastructures.PCFPComposition import PCFPComposition
-from locelim.datastructures.PCFPModule import Location
+from locelim.datastructures.pcfp_module import PCFPModule
+from locelim.datastructures.pcfp_composition import PCFPComposition
+from locelim.datastructures.pcfp_module import Location
+from locelim.datastructures.config import Config
 from locelim.datastructures.util import primitive_type_to_exp, are_locs_equal
 
 
-from locelim.benchmarks.analyser import analyse_locations
 
 class Session:
     """Encapsulates an interactive elimination session
@@ -39,7 +40,7 @@ class Session:
     # private functions
 
     def _exp_mgr(self) -> sp.ExpressionManager:
-        return self._orig_prism_model.expression_manager
+        return self._pcfp_composition.expression_manager
 
     def _get_constants_for_prism_model(self, prism_model) -> Dict[sp.Variable, sp.Expression]:
         # makes a constant substitution dict for the given prism from the raw user provided defs
@@ -98,6 +99,13 @@ class Session:
         self._orig_prism_model = prism_model
         self._pcfp_composition = pcfp_composition
 
+    def flatten(self):
+        """Flattens the current composition into a single module."""
+        self._pcfp_composition.flatten_composition()
+
+    def set_config(self, config: Config):
+        self._pcfp_composition.set_config(config)
+
     def get_model_constants(self):
         """Returns all undefined constants"""
         return [c.name for c in self._orig_prism_model.constants if not c.defined]
@@ -115,7 +123,7 @@ class Session:
         """Sets the reachabilty property given as a string"""
         self._property = property
 
-    def build_orig_model(self, return_time=False):
+    def build_orig_model(self, return_time=False, symbolic=False):
         """Builds the original model"""
         constant_defs = self._get_constants_for_prism_model(self._orig_prism_model)
         orig_prism_constants_defined = self._orig_prism_model.define_constants(constant_defs)
@@ -123,11 +131,17 @@ class Session:
             prop = self._get_property_for_prism_model(orig_prism_constants_defined, define_constants=False)
             logging.info("start building original model ...")
             t_start = time.time()
-            model = sp.build_model(orig_prism_constants_defined, [prop])
+            if symbolic:
+                model = sp.build_symbolic_model(orig_prism_constants_defined, [prop])
+            else:
+                model = sp.build_model(orig_prism_constants_defined, [prop])
         else:
             logging.info("start building original model ...")
             t_start = time.time()
-            model = sp.build_model(orig_prism_constants_defined)
+            if symbolic:
+                model = sp.build_symbolic_model(orig_prism_constants_defined)
+            else:
+                model = sp.build_model(orig_prism_constants_defined)
         t_end = time.time()
         logging.info("finished model building, took {}s".format(t_end - t_start))
         if return_time:
@@ -135,7 +149,7 @@ class Session:
         else:
             return model
 
-    def build_model(self, return_time=False, return_simplified_prism=False):
+    def build_model(self, return_time=False, return_simplified_prism=False, symbolic=False):
         """Builds the model for the current PCFP"""
         simplified_prism_constants_defined = self._get_simplified_prism_model()
         if self._property is not None:
@@ -143,11 +157,17 @@ class Session:
             prop = self._get_property_for_prism_model(simplified_prism_constants_defined, define_constants=False)
             logging.info("start building simplified model ...")
             t_start = time.time()
-            model = sp.build_model(simplified_prism_constants_defined, [prop])
+            if symbolic:
+                model = sp.build_symbolic_model(simplified_prism_constants_defined, [prop])
+            else:
+                model = sp.build_model(simplified_prism_constants_defined, [prop])
         else:
             logging.info("start building simplified model ...")
             t_start = time.time()
-            model = sp.build_model(simplified_prism_constants_defined)
+            if symbolic:
+                model = sp.build_symbolic_model(simplified_prism_constants_defined)
+            else:
+                model = sp.build_model(simplified_prism_constants_defined)
         t_end = time.time()
         logging.info("finished model building, took {}s".format(t_end - t_start))
         if return_simplified_prism:
@@ -200,6 +220,17 @@ class Session:
         else:
             return num_result
 
+    def check_model_exactly(self):
+        storm_path = '~/storm/build/bin/storm'
+        logging.warning(f'assuming storm path is {storm_path}')
+        self._pcfp_composition.save_as_prism("storm_exact_input.prism")
+
+        def constants_string():
+            return ",".join(f"{const}={val}" for const, val in self._constant_defs.items())
+
+        command = f"{storm_path} --prism storm_exact_input.prism --constants {constants_string()} --prop '{self._property}' --exact --explchecks"
+        os.system(command)
+
     def unfold(self, var: str):
         """Unfolds the specified variable."""
         self._pcfp_composition.unfold(self._exp_mgr().get_variable(var))
@@ -223,14 +254,20 @@ class Session:
         loc_to_eliminate = next(self._pcfp_composition.eliminable_locs(goal_predicate), None)
         count = 0
         if max is None:
-            max = 10**10
+            max = 10 ** 10
         while loc_to_eliminate and count < max:
             self._pcfp_composition.eliminate_loc(loc_to_eliminate)
             count += 1
             loc_to_eliminate = next(self._pcfp_composition.eliminable_locs(goal_predicate), None)
 
+    def remove_unreachable_commands(self):
+        """Eliminates all commands in the current composition that are guaranteed to be never taken."""
+        self._pcfp_composition.remove_unreachable_commands()
+
     def get_loc_info(self):
         """Returns detailed information for each location"""
+        # TODO currently does not work
+        raise NotImplementedError
         result = []
         for loc in self._pcfp.get_locs():
             commands = self._pcfp.get_commands_with_source(loc)
@@ -263,43 +300,22 @@ class Session:
             goal_predicate = self._exp_mgr().create_boolean(True)
         else:
             goal_predicate = self._get_goal_predicate()
-        yield from self._pcfp_composition.eliminable_locs(goal_predicate)
-
-    def show_eliminable_locations(self):
-        """Prints the currently directly eliminable locations.
-
-        A location counts as eliminable if the following three conditions holds:
-        - the location has no self-loop
-        - it is guaranteed to be neither initial nor final
-        Note that eliminating one of these locations can make the others non-eliminable!
-        """
-        if self._property is None:
-            goal_predicate = self._exp_mgr.create_boolean(True)
-        else:
-            goal_predicate = self._get_goal_predicate()
-        eliminable_locs = self._pcfp.get_eliminable_locs(goal_predicate)
-        print("currently eliminable locations: {}".format(len(eliminable_locs)))
-        [print("{}, {}".format(loc, self._pcfp.estimate_elim_complexity_for_loc(loc))) for loc in eliminable_locs]
+        for loc in self._pcfp_composition.eliminable_locs(goal_predicate):
+            yield loc, self._pcfp_composition.estimate_elimination_complexity_of_loc(loc)
 
     def get_pcfp_stats(self):
         """Return some statistics about the current PCFP"""
         return {
-            "locations": len(self._pcfp.get_locs()),
-            "commands": len(self._pcfp.commands),
-            "transitions": self._pcfp.count_destinations()
+            "locations": self._pcfp_composition.nr_locations,
+            "commands": self._pcfp_composition.nr_commands,
+            "transitions": self._pcfp_composition.nr_transitions
         }
 
     def show_as_prism(self):
         """Prints the current PCFP as prism"""
-        print(self._pcfp.to_prism_string())
+        print(self._pcfp_composition.to_prism_string())
 
     def save_as_prism(self, path):
         """Saves the current PCFP as a prism file"""
         with open(path, "w") as f:
             f.write(self._pcfp.to_prism_string())
-
-    def analyse_locations(self):
-        analyse_locations(self._pcfp)
-
-    def eliminate_unsatisfiable_commands(self):
-        self._pcfp.eliminate_unsatisfiable_commands()

@@ -1,56 +1,12 @@
-
-    # # unfolding start, recordLast, badObserve, deliver, done creates idempotent self loops
-    # # unfolding new, start, recordLast, badObserve, deliver, creates eliminable locs
-    #
-    # show_pcfp_stats()
-    # #unfold("launch")
-    # unfold("new")
-    # unfold("start")
-    # #unfold("run")
-    # #unfold("lastSeen")
-    #
-    # #unfold("good")
-    # #unfold("bad")
-    # unfold("recordLast")
-    # unfold("badObserve")
-    # unfold("deliver")
-    # #unfold("done")
-    # show_loc_info()
-    # #show_as_prism()
-    # #session().eliminate_unsatisfiable_commands()
-    # #print(session()._pcfp.get_sink_locs_without_targets(session()._get_goal_predicate()))
-    #
-    # show_pcfp_stats()
-    # #session()._pcfp.eliminate_nop_selfloops()
-    # #show_eliminable_locations()
-    # #eliminate_all()
-    #
-    # #eliminate({"new": False, "start": True, "recordLast": True, "badObserve": True, "deliver": True})
-    # #eliminate({"new": False, "start": False, "recordLast": True, "badObserve": True, "deliver": True})
-    # #eliminate({"new": False, "start": True, "recordLast": False, "badObserve": True, "deliver": True})
-    # #eliminate({"new": False, "start": False, "recordLast": False, "badObserve": True, "deliver": True})
-    # #eliminate({"new": False, "start": True, "recordLast": True, "badObserve": False, "deliver": True})
-    # #eliminate({"new": False, "start": False, "recordLast": True, "badObserve": False, "deliver": True})
-    # #eliminate({"new": False, "start": True, "recordLast": False, "badObserve": False, "deliver": True})
-    # eliminate({"new": False, "start": False, "recordLast": False, "badObserve": False, "deliver": True})
-
-
-
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from locelim.benchmarks.benchmark_utils import stat_vars
 from locelim.interactive import *
 
-
-# manual analysis/benchmarking of crowds
 
 def crowds(constant_defs=None):
     reset_session()
 
-    # comment out to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-
-    load_model("originals/crowds.prism")
-    #set_property('P=? [ F observe0>1 & !launch & !new & !start & !run & lastSeen=0 & !good & !bad & done  & !recordLast & !badObserve & !deliver]')
-    set_property('P=? [ F observe0>1  & !new & !start & !recordLast & !badObserve & !deliver]')
+    load_model("models/crowds.prism")
+    set_property('P=? [ F observe0>1 & !deliver]')
     if constant_defs is None:
         constant_defs = {'TotalRuns': 10, 'CrowdSize': 5}
     def_model_constants(constant_defs)
@@ -67,7 +23,7 @@ def crowds(constant_defs=None):
 
     t_start = time.time()
 
-    # actual simplification starts here
+    # start of simplification
     unfold("new")
     unfold("start")
     unfold("recordLast")
@@ -101,5 +57,6 @@ def crowds(constant_defs=None):
 
 
 if __name__ == "__main__":
-    benchmark_info = crowds()
-    print(to_latex_string(benchmark_info))
+    # uncomment to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    crowds()
