@@ -3,9 +3,9 @@
 Relieve your probabilistic model checker: Simplify your input model! This projects help you to do so.
 
 ## Dependencies
-* storm
-* stormpy
-* networkx
+* storm: https://www.stormchecker.org 
+* stormpy: https://moves-rwth.github.io/stormpy/index.html
+* networkx: https://networkx.github.io
 
 ## Usage
 
