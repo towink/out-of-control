@@ -11,10 +11,10 @@ Relieve your probabilistic model checker: Simplify your input model! This projec
 
 ```python
 # Use this import to start your simplification session!
-from locelim.interactive import *
+from ooc.interactive import *
 
 # Load a model and fix a property.
-load_model("models/coupon.10-1.prism")
+load_model("ooc/models/model_files/coupon.10-1.prism")
 set_property("P=? [ F c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9 & s=2]")
 
 # Note: If there are undefined constants in the model (probabilities, variable bounds, etc.),

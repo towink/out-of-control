@@ -1,16 +1,19 @@
-from locelim.benchmarks.benchmark_utils import stat_vars
-from locelim.interactive import *
+from ooc.interactive import *
+from ooc.benchmarks.benchmark_utils import stat_vars
+from ooc.models.files import coupon_10_prism, coupon_count_10_prism
 
 
-def nand(constant_defs=None):
+def coupon(constant_defs=None):
     reset_session()
 
-    load_model("models/nand.prism")
-    show_model_constants()
-    set_property("P=? [ F s=4 & z/N<0.1 ]")
+    load_model(coupon_10_prism)
+    # load_model(coupon_count_10_prism)
     if constant_defs is None:
-        constant_defs = {'N': 10, 'K': 20}
+        constant_defs = {}
+        # constant_defs = {"N": 20}
     def_model_constants(constant_defs)
+    set_property("P=? [ F c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9 & s=2]")
+    # set_property("P=? [ F c0 & c1 & c2 & c3 & c4 & c5 & c6 & c7 & c8 & c9 & s=2 & c=N]")
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
@@ -27,6 +30,8 @@ def nand(constant_defs=None):
     # start of simplification
     unfold("s")
     eliminate_all()
+    unfold("draw")
+    eliminate_all()
     # end of simplification
 
     t_end = time.time()
@@ -42,10 +47,13 @@ def nand(constant_defs=None):
     simpl_cmds = pcfp_stats["commands"]
     simpl_trans = pcfp_stats["transitions"]
 
+    print("result orig: {}".format(res_orig))
+    print("result simpl: {}".format(res_simpl))
+
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'nand'
-    benchmark_info['constant_defs'] = constant_defs
+    benchmark_info['name'] = 'coupon'
+    benchmark_info['constant_defs'] = {"coupons": 10, "draws": 1}
 
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
@@ -56,4 +64,4 @@ def nand(constant_defs=None):
 if __name__ == "__main__":
     # uncomment to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    nand()
+    coupon()

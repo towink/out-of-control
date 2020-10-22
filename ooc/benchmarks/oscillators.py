@@ -1,10 +1,11 @@
-from locelim.interactive import *
+from ooc.interactive import *
+from ooc.models.files import oscillators_6_10_prism
 
 if __name__ == "__main__":
     # uncomment to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-    load_model("models/oscillators.6-10-0.1-1.prism")
+    load_model(oscillators_6_10_prism)
     #def_model_constants({"mu" :0.1, "lambda": 1})
 
 

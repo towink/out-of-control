@@ -8,8 +8,8 @@ import networkx as nx
 
 from stormpy.utility import Z3SmtSolver, SmtCheckResult
 
-from locelim.datastructures.config import Config
-from locelim.datastructures.util import *
+from ooc.datastructures.config import Config
+from ooc.datastructures.util import *
 
 
 class CmdNode:

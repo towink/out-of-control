@@ -1,14 +1,15 @@
-from locelim.benchmarks.benchmark_utils import stat_vars
-from locelim.interactive import *
+from ooc.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from ooc.interactive import *
+from ooc.models.files import zeroconf_prism
 
 
-def brp(constant_defs=None):
+def zeroconf():
     reset_session()
 
-    load_model("models/brp.prism")
-    set_property("P=? [ F s=5 & srep=2 ]")
-    if constant_defs is None:
-        constant_defs = {"N": 2 ** 11, "MAX": 20}
+    load_model(zeroconf_prism)
+    show_model_constants()
+    set_property("Pmax=? [ F (l=4 & ip=1) ]")
+    constant_defs = {"N": 20, "K": 2, "reset": False}
     def_model_constants(constant_defs)
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
@@ -24,16 +25,7 @@ def brp(constant_defs=None):
     t_start = time.time()
 
     # start of simplification
-    # unfolding r,s,l,k all at once makes a lot of locs unreachable!
-    flatten()
-    unfold("r")
-    unfold("s")
-    unfold("l")
-    unfold("k")
-    eliminate_all()
-    unfold("srep")
-    unfold("s_ab")
-    eliminate_all()
+    # TODO
     # end of simplification
 
     t_end = time.time()
@@ -44,6 +36,9 @@ def brp(constant_defs=None):
     states_simpl = len(model_simpl.states)
     transitions_simpl = model_simpl.nr_transitions
 
+    print("result orig: {}".format(res_orig))
+    print("result simpl: {}".format(res_simpl))
+
     # collect info for benchmark table
 
     pcfp_stats = session().get_pcfp_stats()
@@ -53,7 +48,7 @@ def brp(constant_defs=None):
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'brp'
+    benchmark_info['name'] = 'zeroconf'
     benchmark_info['constant_defs'] = constant_defs
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
@@ -62,6 +57,4 @@ def brp(constant_defs=None):
 
 
 if __name__ == "__main__":
-    # uncomment to disable logging
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    brp()
+    zeroconf()

@@ -5,7 +5,7 @@ The "show" functions simply print to the console
 but logging may also be enabled for additional info.
 """
 
-from locelim.interactive import Session
+from ooc.interactive import Session
 
 # create session when file is included
 _session = Session()

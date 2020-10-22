@@ -1,19 +1,20 @@
-from locelim.benchmarks.benchmark_utils import stat_vars
-from locelim.interactive import *
+from ooc.benchmarks.benchmark_utils import stat_vars
+from ooc.interactive import *
+from ooc.models.files import brp_prism
 
 
-def crowds(constant_defs=None):
+def brp(constant_defs=None):
     reset_session()
 
-    load_model("models/crowds.prism")
-    set_property('P=? [ F observe0>1 & !deliver]')
+    load_model(brp_prism)
+    set_property("P=? [ F s=5 & srep=2 ]")
     if constant_defs is None:
-        constant_defs = {'TotalRuns': 10, 'CrowdSize': 5}
+        constant_defs = {"N": 2 ** 11, "MAX": 20}
     def_model_constants(constant_defs)
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
-    states_orig = model_orig.nr_states
+    states_orig = len(model_orig.states)
     transitions_orig = model_orig.nr_transitions
 
     pcfp_stats = session().get_pcfp_stats()
@@ -24,12 +25,16 @@ def crowds(constant_defs=None):
     t_start = time.time()
 
     # start of simplification
-    unfold("new")
-    unfold("start")
-    unfold("recordLast")
-    unfold("badObserve")
-    unfold("deliver")
-    eliminate({"new": False, "start": False, "recordLast": False, "badObserve": False, "deliver": True})
+    # unfolding r,s,l,k all at once makes a lot of locs unreachable!
+    flatten()
+    unfold("r")
+    unfold("s")
+    unfold("l")
+    unfold("k")
+    eliminate_all()
+    unfold("srep")
+    unfold("s_ab")
+    eliminate_all()
     # end of simplification
 
     t_end = time.time()
@@ -37,8 +42,10 @@ def crowds(constant_defs=None):
 
     model_simpl, time_build_simpl = session().build_model(return_time=True)
     res_simpl, time_check_simpl = session().check_model(return_time=True)
-    states_simpl = model_simpl.nr_states
+    states_simpl = len(model_simpl.states)
     transitions_simpl = model_simpl.nr_transitions
+
+    # collect info for benchmark table
 
     pcfp_stats = session().get_pcfp_stats()
     simpl_locs = pcfp_stats["locations"]
@@ -47,9 +54,8 @@ def crowds(constant_defs=None):
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'crowds'
+    benchmark_info['name'] = 'brp'
     benchmark_info['constant_defs'] = constant_defs
-
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
 
@@ -59,4 +65,4 @@ def crowds(constant_defs=None):
 if __name__ == "__main__":
     # uncomment to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    crowds()
+    brp()

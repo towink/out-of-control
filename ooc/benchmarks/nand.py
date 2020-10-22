@@ -1,17 +1,17 @@
-from locelim.benchmarks.benchmark_utils import stat_vars
-from locelim.interactive import *
+from ooc.benchmarks.benchmark_utils import stat_vars
+from ooc.interactive import *
+from ooc.models.files import nand_prism
 
 
-def leader_sync():
+def nand(constant_defs=None):
     reset_session()
 
-    load_model("models/leader_sync.4-8.prism")
-    # P>=1 [ F "elected" ]
-    # set_property("P=? [ F s1=3&s2=3&s3=3 ]")  # for 3-x
-    set_property("P=? [ F s1=3&s2=3&s3=3&s4=3 ]")  # for 4-x
-    # set_property("P=? [ F s1=3&s2=3&s3=3&s4=3&s5=3 ]")  # for 5-x
-    # set_property("P=? [ F s1=3&s2=3&s3=3&s4=3&s5=3&s6=3 ]")  # for 6-x
-
+    load_model(nand_prism)
+    show_model_constants()
+    set_property("P=? [ F s=4 & z/N<0.1 ]")
+    if constant_defs is None:
+        constant_defs = {'N': 10, 'K': 20}
+    def_model_constants(constant_defs)
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
@@ -26,11 +26,8 @@ def leader_sync():
     t_start = time.time()
 
     # start of simplification
-    flatten()
-    unfold("s1")
+    unfold("s")
     eliminate_all()
-    unfold("c")
-    eliminate({"s1": 1, "c": 2})
     # end of simplification
 
     t_end = time.time()
@@ -48,8 +45,8 @@ def leader_sync():
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'leader\\_sync'
-    benchmark_info['constant_defs'] = {"N": 8, "K": 4}
+    benchmark_info['name'] = 'nand'
+    benchmark_info['constant_defs'] = constant_defs
 
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
@@ -60,4 +57,4 @@ def leader_sync():
 if __name__ == "__main__":
     # uncomment to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    leader_sync()
+    nand()

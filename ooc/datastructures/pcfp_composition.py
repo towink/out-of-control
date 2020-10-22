@@ -4,8 +4,8 @@ from typing import Generator
 
 import stormpy as sp
 
-from locelim.datastructures.pcfp_module import PCFPModule, Location
-from locelim.datastructures.config import Config
+from ooc.datastructures.pcfp_module import PCFPModule, Location
+from ooc.datastructures.config import Config
 
 
 class PCFPComposition:

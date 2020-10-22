@@ -1,4 +1,4 @@
-from locelim.interactive import *
+from ooc.interactive import *
 
 
 # this file contains automated tests
@@ -10,9 +10,9 @@ def assert_results_close(res_orig, res_other, epsilon=0.0001):
 
 
 if __name__ == '__main__':
-    models_folder = "../locelim/benchmarks/models/"
+    models_folder = "../ooc/benchmarks/models/"
 
-    # --- test with nand ---
+    # --- tests with nand ---
 
     load_model("{}nand.prism".format(models_folder))
     set_property("P=? [ F s=4 & z/N<0.1 ]")
@@ -42,10 +42,10 @@ if __name__ == '__main__':
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
-    print("nand test complete")
+    print("nand tests complete")
     reset_session()
 
-    # --- test with brp ---
+    # --- tests with brp ---
 
     load_model("{}brp.prism".format(models_folder))
     def_model_constants({"N": 32, "MAX": 4})
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     result_simplified = session().check_model()
     assert_results_close(result_orig, result_simplified)
 
-    print("brp test complete")
+    print("brp tests complete")
     reset_session()
 
     # TODO: write more automated (!) tests here

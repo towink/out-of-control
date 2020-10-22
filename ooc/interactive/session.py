@@ -5,11 +5,11 @@ from typing import Dict, Generator
 
 import stormpy as sp
 
-from locelim.datastructures.pcfp_module import PCFPModule
-from locelim.datastructures.pcfp_composition import PCFPComposition
-from locelim.datastructures.pcfp_module import Location
-from locelim.datastructures.config import Config
-from locelim.datastructures.util import primitive_type_to_exp, are_locs_equal
+from ooc.datastructures.pcfp_module import PCFPModule
+from ooc.datastructures.pcfp_composition import PCFPComposition
+from ooc.datastructures.pcfp_module import Location
+from ooc.datastructures.config import Config
+from ooc.datastructures.util import primitive_type_to_exp, are_locs_equal
 
 
 

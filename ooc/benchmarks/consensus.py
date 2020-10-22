@@ -1,4 +1,5 @@
-from locelim.interactive import *
+from ooc.interactive import *
+from ooc.models.files import consensus_2_prism
 
 import stormpy as sp
 
@@ -6,9 +7,8 @@ if __name__ == "__main__":
     # comment out to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
-    #session().load_composition("models/consensus.2.prism")
 
-    session().load_model("models/consensus.2.prism")
+    session().load_model(consensus_2_prism)
     print(session().get_model_constants())
     session().def_model_constant('K', 2)
     session().set_property("Pmin=? [ F pc1=3 & pc2=3 & coin1=1 & coin2=1]")

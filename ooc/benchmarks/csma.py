@@ -1,6 +1,6 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
-from locelim.interactive import *
-
+from ooc.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from ooc.interactive import *
+from ooc.models.files import csma_2_2_prism
 
 def csma():
     reset_session()
@@ -8,7 +8,7 @@ def csma():
     # comment out to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-    load_model("models/csma.2-2.v1.prism")
+    load_model(csma_2_2_prism)
     show_model_constants()
     set_property('Pmin=? [ F s1=4&s2=4 ]')  # manually adapted
 

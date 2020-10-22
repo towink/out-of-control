@@ -1,20 +1,23 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
-from locelim.interactive import *
+from ooc.benchmarks.benchmark_utils import to_latex_string, stat_vars
+from ooc.interactive import *
+from ooc.models.files import bluetooth_prism
 
 
-def zeroconf():
+def bluetooth(constant_defs=None):
     reset_session()
 
-    load_model("models/zeroconf.v1.prism")
-    show_model_constants()
-    set_property("Pmax=? [ F (l=4 & ip=1) ]")
-    constant_defs = {"N": 20, "K": 2, "reset": False}
+    load_model(bluetooth_prism)
+    set_property("P=? [F (rec = mrec)]")
+    if constant_defs is None:
+        constant_defs = {'mrec': 1}
     def_model_constants(constant_defs)
 
+    # TODO support building the model symbolically, this case study is quite big
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
-    states_orig = len(model_orig.states)
+    states_orig = model_orig.nr_states
     transitions_orig = model_orig.nr_transitions
+
 
     pcfp_stats = session().get_pcfp_stats()
     orig_locs = pcfp_stats["locations"]
@@ -23,8 +26,8 @@ def zeroconf():
 
     t_start = time.time()
 
-    # start of simplification
-    # TODO
+    # actual simplification starts here
+    # TODO we cannot yet handle the init block
     # end of simplification
 
     t_end = time.time()
@@ -32,13 +35,8 @@ def zeroconf():
 
     model_simpl, time_build_simpl = session().build_model(return_time=True)
     res_simpl, time_check_simpl = session().check_model(return_time=True)
-    states_simpl = len(model_simpl.states)
+    states_simpl = model_simpl.nr_states
     transitions_simpl = model_simpl.nr_transitions
-
-    print("result orig: {}".format(res_orig))
-    print("result simpl: {}".format(res_simpl))
-
-    # collect info for benchmark table
 
     pcfp_stats = session().get_pcfp_stats()
     simpl_locs = pcfp_stats["locations"]
@@ -47,8 +45,9 @@ def zeroconf():
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'zeroconf'
+    benchmark_info['name'] = 'nand'
     benchmark_info['constant_defs'] = constant_defs
+
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
 
@@ -56,4 +55,6 @@ def zeroconf():
 
 
 if __name__ == "__main__":
-    zeroconf()
+    # comment out to disable logging
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    bluetooth()

@@ -1,11 +1,11 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string
-from locelim.benchmarks.brp import brp
-from locelim.benchmarks.coin_game import coin_game
-from locelim.benchmarks.coupon import coupon
-from locelim.benchmarks.crowds import crowds
-from locelim.benchmarks.egl import egl
-from locelim.benchmarks.leader_sync import leader_sync
-from locelim.benchmarks.nand import nand
+from ooc.benchmarks.benchmark_utils import to_latex_string
+from ooc.benchmarks.brp import brp
+from ooc.benchmarks.coin_game import coin_game
+from ooc.benchmarks.coupon import coupon
+from ooc.benchmarks.crowds import crowds
+from ooc.benchmarks.egl import egl
+from ooc.benchmarks.leader_sync import leader_sync
+from ooc.benchmarks.nand import nand
 
 
 def make_latex_table_tacas_21_submission():

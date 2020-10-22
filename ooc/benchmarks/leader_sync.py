@@ -1,16 +1,18 @@
-from locelim.benchmarks.benchmark_utils import stat_vars
-from locelim.interactive import *
+from ooc.benchmarks.benchmark_utils import stat_vars
+from ooc.interactive import *
+from ooc.models.files import leader_sync_4_8_prism
 
 
-def coin_game(constant_defs=None):
+def leader_sync():
     reset_session()
 
-    load_model("models/coin_game.prism")
-    show_model_constants()
-    set_property("P=? [ F x>=N & !f ]")
-    if constant_defs is None:
-        constant_defs = {'N': 1000}
-    def_model_constants(constant_defs)
+    load_model(leader_sync_4_8_prism)
+    # P>=1 [ F "elected" ]
+    # set_property("P=? [ F s1=3&s2=3&s3=3 ]")  # for 3-x
+    set_property("P=? [ F s1=3&s2=3&s3=3&s4=3 ]")  # for 4-x
+    # set_property("P=? [ F s1=3&s2=3&s3=3&s4=3&s5=3 ]")  # for 5-x
+    # set_property("P=? [ F s1=3&s2=3&s3=3&s4=3&s5=3&s6=3 ]")  # for 6-x
+
 
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
@@ -25,9 +27,11 @@ def coin_game(constant_defs=None):
     t_start = time.time()
 
     # start of simplification
-    unfold("f")
-    remove_unreachable_commands()
+    flatten()
+    unfold("s1")
     eliminate_all()
+    unfold("c")
+    eliminate({"s1": 1, "c": 2})
     # end of simplification
 
     t_end = time.time()
@@ -45,8 +49,8 @@ def coin_game(constant_defs=None):
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'coin'
-    benchmark_info['constant_defs'] = constant_defs
+    benchmark_info['name'] = 'leader\\_sync'
+    benchmark_info['constant_defs'] = {"N": 8, "K": 4}
 
     for key, value in benchmark_info.items():
         print("{}: {}".format(key, value))
@@ -57,4 +61,4 @@ def coin_game(constant_defs=None):
 if __name__ == "__main__":
     # uncomment to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    coin_game()
+    leader_sync()

@@ -1,22 +1,21 @@
-from locelim.benchmarks.benchmark_utils import to_latex_string, stat_vars
-from locelim.interactive import *
+from ooc.benchmarks.benchmark_utils import stat_vars
+from ooc.interactive import *
+from ooc.models.files import crowds_prism
 
 
-def bluetooth(constant_defs=None):
+def crowds(constant_defs=None):
     reset_session()
 
-    load_model("models/bluetooth.prism")
-    set_property("P=? [F (rec = mrec)]")
+    load_model(crowds_prism)
+    set_property('P=? [ F observe0>1 & !deliver]')
     if constant_defs is None:
-        constant_defs = {'mrec': 1}
+        constant_defs = {'TotalRuns': 10, 'CrowdSize': 5}
     def_model_constants(constant_defs)
 
-    # TODO support building the model symbolically, this case study is quite big
     model_orig, time_build_orig = session().build_orig_model(return_time=True)
     res_orig, time_check_orig = session().check_orig_model(return_time=True)
     states_orig = model_orig.nr_states
     transitions_orig = model_orig.nr_transitions
-
 
     pcfp_stats = session().get_pcfp_stats()
     orig_locs = pcfp_stats["locations"]
@@ -25,8 +24,13 @@ def bluetooth(constant_defs=None):
 
     t_start = time.time()
 
-    # actual simplification starts here
-    # TODO we cannot yet handle the init block
+    # start of simplification
+    unfold("new")
+    unfold("start")
+    unfold("recordLast")
+    unfold("badObserve")
+    unfold("deliver")
+    eliminate({"new": False, "start": False, "recordLast": False, "badObserve": False, "deliver": True})
     # end of simplification
 
     t_end = time.time()
@@ -44,7 +48,7 @@ def bluetooth(constant_defs=None):
 
     local_vars = locals()
     benchmark_info = dict([(var, local_vars[var]) for var in stat_vars])
-    benchmark_info['name'] = 'nand'
+    benchmark_info['name'] = 'crowds'
     benchmark_info['constant_defs'] = constant_defs
 
     for key, value in benchmark_info.items():
@@ -54,6 +58,6 @@ def bluetooth(constant_defs=None):
 
 
 if __name__ == "__main__":
-    # comment out to disable logging
+    # uncomment to disable logging
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    bluetooth()
+    crowds()

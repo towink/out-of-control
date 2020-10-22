@@ -1,11 +1,12 @@
-from locelim.benchmarks.benchmark_utils import stat_vars
-from locelim.interactive import *
+from ooc.benchmarks.benchmark_utils import stat_vars
+from ooc.interactive import *
+from ooc.models.files import egl_prism
 
 
 def egl(constant_defs=None):
     reset_session()
 
-    load_model("models/egl.prism")
+    load_model(egl_prism)
     # TODO labels in properties not yet supported, so here's a workaround
     L = 2
     kB = f"( (a0={L}  & a20={L})\
