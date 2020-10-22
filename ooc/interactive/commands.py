@@ -48,10 +48,22 @@ def def_model_constant(name: str, value: object):
     _session.def_model_constant(name, value)
 
 
+def show_unfoldable_variables():
+    raise NotImplementedError
+
+
 def show_orig_model_info():
     """Prints info about the original built model (not the original prism!)"""
-    original_model = _session.build_orig_model()
-    print(original_model)  # prints storm's model stats string
+    model, t = _session.build_orig_model(return_time=True)
+    print(model)  # prints storm's model stats string
+    print("model was built in {:.3f}s".format(t))
+
+
+def show_model_info():
+    """Prints info about the current model"""
+    model, t = _session.build_model(return_time=True)
+    print(model)  # prints storm's model stats string
+    print("model was built in {:.3f}s".format(t))
 
 
 def set_property(property: str):
@@ -61,8 +73,14 @@ def set_property(property: str):
 
 def check_orig_model():
     """Checks the original model and prints result, constants and property must be defined"""
-    num_result = _session.check_orig_model()
-    print("result: {} (original model)".format(num_result))
+    num_result, t = _session.check_orig_model(return_time=True)
+    print("result: {} ({:.3f}s, original model)".format(num_result, t))
+
+
+def check_model():
+    """Checks the original model and prints result, constants and property must be defined"""
+    num_result, t = _session.check_model(return_time=True)
+    print("result: {} ({:.3f}s, original model)".format(num_result, t))
 
 
 def show_pcfp_stats():
